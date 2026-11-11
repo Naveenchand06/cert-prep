@@ -31,6 +31,10 @@ The site is configured as a static site for Vercel: import the repository, use t
 
 The CKA page uses the current Linux Foundation domain weights and includes progress by domain and a weighted readiness score. Progress is local to the browser and records tasks marked mastered. The task prompts are original study exercises shaped by the published curriculum and common public lab patterns; they are not actual exam dumps. Practice in a disposable Kubernetes lab before running cluster-changing commands.
 
+The **Node paths & etcd** tab covers kubeadm's usual control-plane static Pod manifests, kubelet files, kubeconfigs, PKI, etcd data directory, node process inspection over SSH, and a TLS-authenticated etcd snapshot example. Paths are defaults: inspect the designated host and component manifest/config when a task or cluster differs. Kubernetes documents kubeadm static Pods under `/etc/kubernetes/manifests`; it warns to keep backups outside that watched directory.
+
+The CKA objective explicitly includes creating and managing clusters with kubeadm, and Linux Foundation exam instructions describe SSH to a designated host for each task. Public exam guidance does not guarantee that every prebuilt cluster is exclusively kubeadm-created, so this guide teaches the kubeadm defaults while prompting you to verify the actual host configuration.
+
 Current domain weights:
 
 | Domain | Weight |
@@ -51,6 +55,9 @@ The command drills cover context/namespace handling, imperative generators, insp
 - [TechiesCamp public practice question guide](https://github.com/techiescamp/cka-certification-guide/blob/main/PRACTICE_QUESTIONS.md)
 - [chadmcrowell CKA Exercises](https://github.com/chadmcrowell/CKA-Exercises)
 - [Killercoda Kubernetes playgrounds](https://killercoda.com/playgrounds)
+- [Kubernetes kubeadm implementation details and default paths](https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/)
+- [Kubernetes static Pod manifests](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/)
+- [Kubernetes etcd snapshot and restore guide](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
 
 The public question repositories are linked as external study materials rather than copied into this repo; check each repository's license and attribution before reusing its content.
 

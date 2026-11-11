@@ -26,6 +26,7 @@
     <nav class="cka-nav" aria-label="CKA study sections">
       <button class="cka-tab" :class="{active: view === 'overview'}" @click="view='overview'">Overview</button>
       <button class="cka-tab" :class="{active: view === 'commands'}" @click="view='commands'">Command drills</button>
+      <button class="cka-tab" :class="{active: view === 'nodes'}" @click="view='nodes'">Node paths & etcd</button>
       <button class="cka-tab" :class="{active: view === 'practice'}" @click="view='practice'">Practice tasks <span class="muted">({{ tasks.length }})</span></button>
     </nav>
 
@@ -87,6 +88,90 @@ k apply -f pod.yaml
 k get pod web -o yaml</pre><button class="copy-btn" @click="copy('k run web --image=nginx --dry-run=client -o yaml > pod.yaml\nvi pod.yaml\nk apply -f pod.yaml\nk get pod web -o yaml')">Copy</button></div><p class="cka-subtitle">Generate a valid starting point. Add fields that kubectl doesn't expose as flags (probes, securityContext, volumes, affinity) in YAML.</p></div>
         <div><h3>Remember the short flags</h3><div class="callout" style="margin-top:10px"><code>-n</code> namespace · <code>-A</code> all namespaces · <code>-o wide</code> node/IP view · <code>-o yaml</code> manifest · <code>-f</code> file · <code>-l</code> label selector · <code>--tail</code> log lines · <code>-w</code> watch</div><div class="tip" style="margin-top:12px"><b>Verify:</b> After every change, query the object or test connectivity. A green command exit code does not prove the requested outcome.</div></div>
       </div>
+    </section>
+
+    <section v-if="view === 'nodes'" class="cka-grid">
+      <div>
+        <article class="cka-card">
+          <h2>kubeadm node paths</h2><p class="cka-subtitle">These are kubeadm defaults. Run host-level commands on the task's designated node over SSH; paths can vary with cluster configuration.</p>
+          <div style="overflow-x:auto"><table class="command-table"><thead><tr><th>Component / data</th><th>Default path</th><th>Where / notes</th></tr></thead><tbody>
+            <tr><td>API server manifest</td><td><code>/etc/kubernetes/manifests/kube-apiserver.yaml</code></td><td>Control-plane node; static Pod manifest</td></tr>
+            <tr><td>Controller manager manifest</td><td><code>/etc/kubernetes/manifests/kube-controller-manager.yaml</code></td><td>Control-plane node; static Pod manifest</td></tr>
+            <tr><td>Scheduler manifest</td><td><code>/etc/kubernetes/manifests/kube-scheduler.yaml</code></td><td>Control-plane node; static Pod manifest</td></tr>
+            <tr><td>Local etcd manifest</td><td><code>/etc/kubernetes/manifests/etcd.yaml</code></td><td>Control-plane node only with stacked/local etcd</td></tr>
+            <tr><td>Static Pod directory</td><td><code>/etc/kubernetes/manifests/</code></td><td>Default kubelet <code>staticPodPath</code>; verify in kubelet config</td></tr>
+            <tr><td>Kubelet config</td><td><code>/var/lib/kubelet/config.yaml</code></td><td>Present on every node</td></tr>
+            <tr><td>Kubelet kubeadm args</td><td><code>/var/lib/kubelet/kubeadm-flags.env</code></td><td>Runtime endpoint and node flags; every node</td></tr>
+            <tr><td>Kubelet service/drop-ins</td><td><code>systemctl cat kubelet</code></td><td>Shows effective unit and drop-in paths; varies by OS/package</td></tr>
+            <tr><td>Kubeconfigs</td><td><code>/etc/kubernetes/admin.conf</code>, <code>controller-manager.conf</code>, <code>scheduler.conf</code>, <code>kubelet.conf</code></td><td>Control plane; kubelet.conf also exists on workers</td></tr>
+            <tr><td>Certificates and keys</td><td><code>/etc/kubernetes/pki/</code>, <code>/etc/kubernetes/pki/etcd/</code></td><td>Control plane; protect private keys</td></tr>
+            <tr><td>Stacked etcd data</td><td><code>/var/lib/etcd/</code></td><td>Default local etcd dataDir; inspect manifest first</td></tr>
+            <tr><td>kubeadm cluster config</td><td><code>kube-system/kubeadm-config</code> ConfigMap</td><td>Read with kubectl; not a node file</td></tr>
+            <tr><td>kube-proxy / CoreDNS</td><td><code>kube-system</code> ConfigMaps and workloads</td><td>Usually DaemonSet / Deployment config, not control-plane static Pods</td></tr>
+          </tbody></table></div>
+          <div class="tip" style="margin-top:14px"><strong>Static Pod edit:</strong> back up manifests outside <code>/etc/kubernetes/manifests</code>. Kubelet reads every non-hidden file in the watched directory; a <code>.bak</code> copy there can cause an unintended Pod. Edit the manifest on the node, then watch kubelet recreate the Pod.</div>
+        </article>
+        <article class="cka-card">
+          <h2>Inspect processes on the task node</h2><p class="cka-subtitle">Follow the task's host instruction (for example, <code>ssh controlplane</code>) and elevate if needed. Repeat on each node named by the task.</p>
+          <div class="code-wrap"><pre>ssh &lt;designated-node&gt;
+sudo -i
+
+# kubelet is a systemd service on every node
+systemctl status kubelet --no-pager
+systemctl cat kubelet
+journalctl -u kubelet -n 100 --no-pager
+
+# CRI containers, including control-plane static Pods
+crictl ps -a
+crictl pods
+crictl ps -a --name kube-apiserver
+crictl logs &lt;container-id&gt;
+
+# Host process view; control-plane components run as containers
+ps -ef | grep -E '[k]ubelet|[k]ube-apiserver|[k]ube-scheduler|[k]ube-controller-manager|[e]tcd'
+
+# API view when the API server is healthy
+k get pods -n kube-system -o wide
+k describe pod kube-apiserver-&lt;node&gt; -n kube-system
+
+# Check kubelet's actual static manifest path
+grep -n 'staticPodPath' /var/lib/kubelet/config.yaml</pre></div>
+          <p class="cka-subtitle" style="margin:10px 0 0">If <code>crictl</code> cannot find the runtime socket, inspect <code>systemctl cat kubelet</code> and <code>/var/lib/kubelet/kubeadm-flags.env</code> for its configured CRI endpoint. Workers normally run kubelet and workload containers; control-plane components are usually absent.</p>
+        </article>
+      </div>
+      <aside>
+        <article class="cka-card">
+          <h2>Back up stacked etcd</h2><p class="cka-subtitle">Run on the control-plane host that runs local etcd. Confirm endpoint and certificate paths in <code>etcd.yaml</code>; external etcd uses its own endpoint and credentials.</p>
+          <div class="code-wrap"><pre># Keep the snapshot outside etcd's live data directory
+sudo install -d -m 700 /opt/etcd-backup
+
+sudo ETCDCTL_API=3 etcdctl \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  snapshot save /opt/etcd-backup/snapshot.db
+
+# Preferred verification (etcdutl version should match etcd)
+sudo etcdutl --write-out=table snapshot status /opt/etcd-backup/snapshot.db
+# If etcdutl is unavailable in the lab, this older etcdctl form may exist:
+sudo ETCDCTL_API=3 etcdctl --write-out=table snapshot status /opt/etcd-backup/snapshot.db
+sudo ls -lh /opt/etcd-backup/snapshot.db</pre></div>
+          <ul class="habit-list"><li><span>1</span><span>Check the etcd container flags if endpoint or certificate names differ.</span></li><li><span>2</span><span>Use an <b>etcdutl</b> version compatible with the etcd major/minor for status and restore.</span></li><li><span>3</span><span>Snapshots contain cluster secrets and state; protect them and keep them off the live data path.</span></li></ul>
+          <div class="tip" style="margin-top:14px"><strong>Restore is separate and disruptive.</strong> Do not restore during a backup task; restore changes the data directory and static Pod configuration.</div>
+        </article>
+        <article class="cka-card">
+          <h2>What the exam confirms</h2>
+          <p class="cka-subtitle">The published CKA competencies explicitly include creating and managing clusters with kubeadm. Linux Foundation instructions say tasks identify a designated SSH host. Public guidance does not promise every prebuilt exam cluster is exclusively kubeadm-created, so treat these as kubeadm defaults and inspect the actual host configuration.</p>
+          <div class="resource-list">
+            <a href="https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/" target="_blank" rel="noopener">Linux Foundation · CKA competencies <span>↗</span></a>
+            <a href="https://docs.linuxfoundation.org/tc-docs/certification/tips-cka-and-ckad" target="_blank" rel="noopener">Linux Foundation · exam host instructions <span>↗</span></a>
+            <a href="https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/" target="_blank" rel="noopener">Kubernetes · kubeadm file paths <span>↗</span></a>
+            <a href="https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/" target="_blank" rel="noopener">Kubernetes · static Pod behavior <span>↗</span></a>
+            <a href="https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/" target="_blank" rel="noopener">Kubernetes · etcd snapshot and restore <span>↗</span></a>
+          </div>
+        </article>
+      </aside>
     </section>
 
     <section v-if="view === 'practice'">
