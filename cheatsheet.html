@@ -20,11 +20,12 @@
     <!-- ============ Top bar ============ -->
     <header class="topbar">
       <button class="icon-btn nav-toggle" @click="navOpen = !navOpen" aria-label="Sections">☰</button>
-      <a class="brand" href="index.html"><span class="brand-logo">☁️</span> AWS Certs Prep</a>
+      <a class="brand" href="index.html"><span class="brand-logo">☁️</span> Cloud Certs Lab</a>
       <nav class="site-links">
-        <a href="index.html">Practice Exam</a>
+        <a href="saa.html">Practice Exam</a>
         <a href="study-guide.html">Ways to Quickly Pass SAA</a>
         <a class="active" href="cheatsheet.html">Cheatsheet</a>
+        <a href="cka.html">CKA</a>
       </nav>
       <div class="topbar-actions">
         <button class="icon-btn" @click="hl = !hl" :class="{ on: hl }" :title="hl ? 'Turn keyword highlights off' : 'Turn keyword highlights on'">✨</button>
@@ -217,7 +218,7 @@
 
         <footer class="page-foot">
           <a class="btn" href="study-guide.html">← Study guide</a>
-          <a class="btn primary" href="index.html">Start practising →</a>
+          <a class="btn primary" href="saa.html">Start practising →</a>
         </footer>
       </main>
     </div>

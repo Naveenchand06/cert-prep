@@ -3,104 +3,45 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AWS SAA Practice Exam</title>
+  <meta name="description" content="A focused study workspace for AWS Solutions Architect Associate and Certified Kubernetes Administrator practice." />
+  <title>Cloud Certs Lab — Choose your path</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="platform.css" />
   <script src="theme.js"></script>
 </head>
 <body>
-  <nav class="site-nav">
-    <div class="site-nav-inner">
-      <a class="site-brand" href="index.html">AWS Certs Prep</a>
-      <div class="site-links">
-        <a class="site-link active" href="index.html">Practice Exam</a>
-        <a class="site-link" href="study-guide.html">Ways to Quickly Pass SAA</a>
-        <a class="site-link" href="cheatsheet.html">Cheatsheet</a>
-      </div>
-    </div>
-  </nav>
-
-  <div class="app" id="app">
-    <!-- Start screen -->
-    <section id="screen-start" class="screen">
-      <header class="hero">
-        <h1>AWS Certification Prep</h1>
-        <p class="subtitle">Solutions Architect &ndash; Associate (SAA-C03)</p>
-      </header>
-
-      <div class="card">
-        <h2>Start a practice session</h2>
-
-        <label class="field-label">Topics</label>
-        <div class="topic-options" id="topic-options"></div>
-
-        <label class="field-label">Number of questions</label>
-        <div class="count-options" id="count-options"></div>
-
-        <p class="pool-note" id="pool-note"></p>
-
-        <button class="btn btn-primary btn-lg" id="btn-start">Start Exam</button>
-      </div>
-
-      <div class="card" id="coverage-card">
-        <h2>Your coverage</h2>
-        <div class="coverage-bar"><div class="coverage-fill" id="coverage-fill"></div></div>
-        <p class="muted" id="coverage-text"></p>
-        <button class="btn btn-small" id="btn-reset-seen">Reset seen history</button>
-      </div>
-
-      <div class="card" id="history-card" hidden>
-        <h2>Recent sessions</h2>
-        <ul id="history-list" class="history-list"></ul>
-      </div>
+  <nav class="site-nav"><div class="site-nav-inner">
+    <a class="site-brand" href="index.html">Cloud Certs Lab</a>
+    <div class="site-links"><a class="site-link active" href="index.html">Choose a path</a></div>
+  </div></nav>
+  <main id="home" class="platform-shell" v-cloak>
+    <section class="platform-hero">
+      <div class="eyebrow"><span class="status-dot"></span> YOUR PERSONAL CLOUD STUDY WORKSPACE</div>
+      <h1>Learn it. <span class="gradient-text">Run it.</span> Remember it.</h1>
+      <p>Pick a certification path to continue. Your practice history stays in this browser.</p>
     </section>
-
-    <!-- Exam screen -->
-    <section id="screen-exam" class="screen" hidden>
-      <div class="exam-topbar">
-        <span id="exam-progress-text"></span>
-        <span id="exam-timer">00:00</span>
-      </div>
-      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-
-      <div class="card question-card">
-        <div class="tag-row">
-          <span class="domain-tag" id="q-topic"></span>
-          <span class="type-tag" id="q-type"></span>
-        </div>
-        <h2 class="question-text" id="q-text"></h2>
-        <p class="pick-hint" id="q-hint"></p>
-        <div class="options" id="q-options"></div>
-      </div>
-
-      <div class="exam-nav">
-        <button class="btn" id="btn-prev">&larr; Previous</button>
-        <button class="btn btn-primary" id="btn-next">Next &rarr;</button>
-        <button class="btn btn-success" id="btn-finish" hidden>Finish Exam</button>
-      </div>
+    <section class="path-grid" aria-label="Certification paths">
+      <a class="path-card path-aws" href="saa.html">
+        <div class="path-topline"><span class="path-icon">☁</span><span class="path-kicker">AWS · ASSOCIATE</span><span class="arrow">↗</span></div>
+        <h2>Solutions Architect</h2><p class="path-code">SAA-C03</p>
+        <p class="path-copy">Build exam instincts with scenario questions, service comparisons, and a searchable field guide.</p>
+        <div class="path-tags"><span>Practice exams</span><span>Service cheatsheet</span><span>Study guide</span></div>
+        <span class="path-action">Open AWS path <span>→</span></span>
+      </a>
+      <a class="path-card path-k8s" href="cka.html">
+        <div class="path-topline"><span class="path-icon">⎈</span><span class="path-kicker">CLOUD NATIVE · ADMIN</span><span class="arrow">↗</span></div>
+        <h2>Kubernetes Administrator</h2><p class="path-code">CKA · KUBERNETES v1.37</p>
+        <p class="path-copy">Build command muscle memory, study the weighted exam domains, and work through timed hands-on tasks.</p>
+        <div class="path-tags"><span>kubectl drills</span><span>Exam-style labs</span><span>Readiness score</span></div>
+        <span class="path-action">Open CKA path <span>→</span></span>
+      </a>
     </section>
-
-    <!-- Results screen -->
-    <section id="screen-results" class="screen" hidden>
-      <div class="card score-card">
-        <h1 id="score-headline"></h1>
-        <div class="score-big" id="score-big"></div>
-        <p class="muted" id="score-detail"></p>
-        <div id="domain-breakdown" class="domain-breakdown"></div>
-      </div>
-
-      <h2 class="review-heading">Answer Review</h2>
-      <div id="review-list"></div>
-
-      <div class="exam-nav">
-        <button class="btn btn-primary btn-lg" id="btn-restart">New Session</button>
-      </div>
-    </section>
-  </div>
-
-  <script src="questions.js"></script>
-  <script src="app.js"></script>
+    <footer class="platform-footer">Independent study notes · Content links to official and community resources</footer>
+  </main>
+  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+  <script>Vue.createApp({}).mount('#home');</script>
 </body>
 </html>

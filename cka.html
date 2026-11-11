@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CKA study dashboard with exam-weighted topics, kubectl command drills, and hands-on practice tasks." />
+  <title>CKA Study Workspace — Cloud Certs Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="platform.css" />
+  <script src="theme.js"></script>
+</head>
+<body>
+  <nav class="site-nav"><div class="site-nav-inner">
+    <a class="site-brand" href="index.html">Cloud Certs Lab</a>
+    <div class="site-links"><a class="site-link" href="index.html">All paths</a><a class="site-link active" href="cka.html">CKA workspace</a><a class="site-link" href="saa.html">AWS SAA</a></div>
+  </div></nav>
+  <main id="cka" class="cka-shell" v-cloak>
+    <header class="cka-heading">
+      <div><div class="kicker">CERTIFIED KUBERNETES ADMINISTRATOR</div><h1>CKA Study Workspace</h1><p>Learn the exam domains, drill the commands, then solve hands-on tasks in a Kubernetes lab. Mastery is saved on this device.</p></div>
+      <div class="callout"><strong>Exam format:</strong> 2 hours · performance-based · Kubernetes v1.37<br><span>Domain weights last checked against Linux Foundation guidance.</span></div>
+    </header>
+
+    <nav class="cka-nav" aria-label="CKA study sections">
+      <button class="cka-tab" :class="{active: view === 'overview'}" @click="view='overview'">Overview</button>
+      <button class="cka-tab" :class="{active: view === 'commands'}" @click="view='commands'">Command drills</button>
+      <button class="cka-tab" :class="{active: view === 'practice'}" @click="view='practice'">Practice tasks <span class="muted">({{ tasks.length }})</span></button>
+    </nav>
+
+    <section v-if="view === 'overview'" class="cka-grid">
+      <div>
+        <article class="cka-card">
+          <h2>Exam domains & your progress</h2><p class="cka-subtitle">The exam weighting helps you spend practice time where it matters. Progress is based on tasks you mark mastered.</p>
+          <div v-for="domain in domains" :key="domain.name" class="domain-row">
+            <div class="domain-meta"><span class="domain-name">{{ domain.name }}</span><span class="domain-weight">{{ domain.weight }}%</span></div>
+            <div class="mini-track"><div class="mini-fill" :style="{width: domainProgress(domain.name) + '%'}"></div></div>
+            <div class="domain-foot"><span>{{ domain.topics }}</span><b>{{ domainProgress(domain.name) }}% · {{ doneCount(domain.name) }}/{{ taskCount(domain.name) }} tasks</b></div>
+          </div>
+        </article>
+        <article class="cka-card">
+          <h2>Muscle memory checklist</h2><p class="cka-subtitle">Repeat these until the first move is automatic. Do them in a disposable cluster.</p>
+          <ul class="habit-list">
+            <li><span>01</span><span>Set the <b>context and namespace</b> before touching resources.</span></li>
+            <li><span>02</span><span>Generate a manifest with <b>--dry-run=client -o yaml</b>, then edit and apply.</span></li>
+            <li><span>03</span><span>Find failures with <b>get → describe → logs → events</b>.</span></li>
+            <li><span>04</span><span>For node work, <b>cordon → drain → upgrade/repair → uncordon</b>.</span></li>
+            <li><span>05</span><span>For storage, check <b>PVC → PV → StorageClass → pod events</b>.</span></li>
+            <li><span>06</span><span>Verify the requested state explicitly; don't stop at a successful command.</span></li>
+          </ul>
+        </article>
+      </div>
+      <aside>
+        <article class="cka-card">
+          <h2>Weighted readiness</h2><p class="cka-subtitle">Weighted average of task mastery by exam domain.</p>
+          <div class="readiness"><div class="readiness-number">{{ readiness }}<small>%</small></div><div class="readiness-track"><div class="readiness-fill" :style="{width: readiness + '%'}"></div></div></div>
+          <div class="callout"><strong>{{ readinessMessage }}</strong><br>Mark a task mastered only after completing it without looking at the solution.</div>
+          <div class="reset-row"><button class="small-btn" @click="resetProgress">Reset CKA progress</button></div>
+        </article>
+        <article class="cka-card">
+          <h2>Curated resources</h2><p class="cka-subtitle">Syllabus and practice sources used to shape this workspace.</p>
+          <div class="resource-list">
+            <a href="https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/" target="_blank" rel="noopener">Linux Foundation · exam domains <span>↗</span></a>
+            <a href="https://kodekloud.com/courses/cka-certification-course-certified-kubernetes-administrator/" target="_blank" rel="noopener">KodeKloud · CKA course & labs <span>↗</span></a>
+            <a href="https://kodekloud.com/community/" target="_blank" rel="noopener">KodeKloud · community practice <span>↗</span></a>
+            <a href="https://github.com/techiescamp/cka-certification-guide/blob/main/PRACTICE_QUESTIONS.md" target="_blank" rel="noopener">TechiesCamp · public practice questions <span>↗</span></a>
+            <a href="https://github.com/chadmcrowell/CKA-Exercises" target="_blank" rel="noopener">chadmcrowell · CKA exercises <span>↗</span></a>
+            <a href="https://killercoda.com/playgrounds" target="_blank" rel="noopener">Killercoda · free Kubernetes playgrounds <span>↗</span></a>
+          </div>
+          <p class="cka-subtitle" style="margin:14px 0 0">The tasks here are original study prompts based on published curriculum and common public lab patterns; they are not recalled or leaked exam questions. Use the linked repositories for their full question sets and license terms.</p>
+        </article>
+      </aside>
+    </section>
+
+    <section v-if="view === 'commands'" class="cka-card">
+      <h2>Kubectl shorthand & command drills</h2><p class="cka-subtitle">Practice typing the command from the task, not only reading a cheat sheet. In an exam shell, confirm which aliases and completions are already configured.</p>
+      <div class="callout" style="margin-bottom:16px"><strong>Setup reminder:</strong> Alias <code>k</code> and completion are commonly available in the exam environment. Learn the patterns; verify your shell instead of assuming setup.</div>
+      <div class="topic-filters"><button class="filter-btn" :class="{active: commandFilter === 'All'}" @click="commandFilter='All'">All</button><button v-for="group in commandGroups" :key="group" class="filter-btn" :class="{active: commandFilter === group}" @click="commandFilter=group">{{ group }}</button></div>
+      <div style="overflow-x:auto"><table class="command-table"><thead><tr><th>Use</th><th>Pattern</th><th>Why it saves time</th></tr></thead><tbody>
+        <tr v-for="(item, i) in filteredCommands" :key="i"><td>{{ item.use }}</td><td class="cmd-cell"><code>{{ item.command }}</code> <button class="command-copy" @click="copy(item.command)">Copy</button></td><td>{{ item.note }}</td></tr>
+      </tbody></table></div>
+      <div class="cka-grid" style="margin-top:22px">
+        <div><h3>Fast manifest workflow</h3><div class="code-wrap"><pre>k run web --image=nginx --dry-run=client -o yaml > pod.yaml
+vi pod.yaml
+k apply -f pod.yaml
+k get pod web -o yaml</pre><button class="copy-btn" @click="copy('k run web --image=nginx --dry-run=client -o yaml > pod.yaml\nvi pod.yaml\nk apply -f pod.yaml\nk get pod web -o yaml')">Copy</button></div><p class="cka-subtitle">Generate a valid starting point. Add fields that kubectl doesn't expose as flags (probes, securityContext, volumes, affinity) in YAML.</p></div>
+        <div><h3>Remember the short flags</h3><div class="callout" style="margin-top:10px"><code>-n</code> namespace · <code>-A</code> all namespaces · <code>-o wide</code> node/IP view · <code>-o yaml</code> manifest · <code>-f</code> file · <code>-l</code> label selector · <code>--tail</code> log lines · <code>-w</code> watch</div><div class="tip" style="margin-top:12px"><b>Verify:</b> After every change, query the object or test connectivity. A green command exit code does not prove the requested outcome.</div></div>
+      </div>
+    </section>
+
+    <section v-if="view === 'practice'">
+      <div class="callout" style="margin-bottom:16px"><strong>Hands-on loop:</strong> Open a disposable lab, read one task, set any required context, solve it before opening the solution, then verify the final state. KodeKloud labs and Killercoda playgrounds are linked on Overview.</div>
+      <div class="topic-filters"><button class="filter-btn" :class="{active: taskFilter === 'All'}" @click="taskFilter='All'">All domains</button><button v-for="domain in domains" :key="domain.name" class="filter-btn" :class="{active: taskFilter === domain.name}" @click="taskFilter=domain.name">{{ domain.short }} · {{ domain.weight }}%</button></div>
+      <div class="task-list">
+        <article v-for="task in filteredTasks" :key="task.id" class="task-card">
+          <div class="task-main">
+            <div class="task-header"><div><div class="task-tags"><span class="pill">{{ task.domain }}</span><span class="pill weight">{{ task.difficulty }}</span></div><h3>{{ task.title }}</h3></div></div>
+            <p class="task-prompt">{{ task.prompt }}</p>
+            <div class="task-controls"><button class="small-btn" @click="revealed[task.id] = !revealed[task.id]">{{ revealed[task.id] ? 'Hide solution' : 'Show solution' }}</button><button class="small-btn" :class="{done: isDone(task.id)}" @click="toggleDone(task.id)">{{ isDone(task.id) ? '✓ Mastered' : 'Mark mastered' }}</button><span class="muted" style="font-size:.75rem;align-self:center">{{ task.time }}</span></div>
+          </div>
+          <div v-if="revealed[task.id]" class="answer-panel"><p><strong>One possible approach</strong> — resource names and versions may vary by lab. Verify against the task requirements.</p><div v-for="(step, index) in task.steps" :key="index"><p v-if="step.note">{{ step.note }}</p><div v-if="step.code" class="code-wrap"><pre>{{ step.code }}</pre><button class="copy-btn" @click="copy(step.code)">Copy</button></div></div><div class="tip"><strong>Check:</strong> {{ task.check }}</div></div>
+        </article>
+      </div>
+    </section>
+    <footer class="platform-footer">Study content reviewed {{ reviewedDate }} · Exam objectives can change; check the Linux Foundation page before your exam.</footer>
+  </main>
+  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+  <script src="cka.js"></script>
+</body>
+</html>
