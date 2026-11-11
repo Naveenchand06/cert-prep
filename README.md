@@ -16,10 +16,22 @@ python3 -m http.server 8111
 | Page | Purpose |
 |---|---|
 | `index.html` | Certification path picker: AWS SAA or CKA |
-| `saa.html` | SAA-C03 practice exams |
-| `study-guide.html` | SAA course triage guide |
-| `cheatsheet.html` | SAA dark-first interactive cheatsheet and service directory |
-| `cka.html` | CKA study dashboard, domains, command drills and practice tasks |
+| `pages/saa.html` | SAA-C03 practice exams |
+| `pages/study-guide.html` | SAA course triage guide |
+| `pages/cheatsheet.html` | SAA dark-first interactive cheatsheet and service directory |
+| `pages/cka.html` | CKA study dashboard, domains, command drills and practice tasks |
+
+## Project structure
+
+```text
+cert-prep/
+├── index.html          # Entry point: certification path picker
+├── pages/              # All other pages (cka, saa, study-guide, cheatsheet)
+├── css/                # Stylesheets: style.css (shared/SAA), platform.css (home + CKA), cheatsheet.css
+├── js/                 # Scripts: theme.js, app.js, questions.js, guide.js, services.js,
+│                       #   cheatsheet.js, cheatsheet-data.js, cka.js
+└── README.md
+```
 
 ## Framework choice
 
@@ -63,8 +75,8 @@ The public question repositories are linked as external study materials rather t
 
 ## SAA question bank
 
-All SAA questions remain in `questions.js`. `saa.html` provides the topic-filtered practice exam, coverage tracking, randomized choices, partial-credit review, and session history. The SAA cheatsheet content is in `cheatsheet-data.js`, with its service directory in `services.js`.
+All SAA questions remain in `js/questions.js`. `pages/saa.html` provides the topic-filtered practice exam, coverage tracking, randomized choices, partial-credit review, and session history. The SAA cheatsheet content is in `js/cheatsheet-data.js`, with its service directory in `js/services.js`.
 
 ## Deploy to Vercel
 
-This is a static multi-page site. In Vercel, select **Other** as the framework preset, leave build and install commands empty, and set the output directory to `.`. The default URLs (`/`, `/saa.html`, `/cka.html`, and supporting pages) need no rewrite configuration.
+This is a static multi-page site. In Vercel, select **Other** as the framework preset, leave build and install commands empty, and set the output directory to `.`. The default URLs (`/`, `/pages/saa.html`, `/pages/cka.html`, and supporting pages) need no rewrite configuration.
