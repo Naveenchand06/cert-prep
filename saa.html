@@ -40,6 +40,8 @@
         <label class="field-label">Number of questions</label>
         <div class="count-options" id="count-options"></div>
 
+        <label class="mode-option"><input id="timed-mode" type="checkbox" /> Timed exam mode <span class="muted">65 questions · 130 minutes</span></label>
+
         <p class="pool-note" id="pool-note"></p>
 
         <button class="btn btn-primary btn-lg" id="btn-start">Start Exam</button>
@@ -78,8 +80,18 @@
 
       <div class="exam-nav">
         <button class="btn" id="btn-prev">&larr; Previous</button>
+        <button class="btn" id="btn-flag" type="button" aria-pressed="false">☆ Flag for review</button>
         <button class="btn btn-primary" id="btn-next">Next &rarr;</button>
         <button class="btn btn-success" id="btn-finish" hidden>Finish Exam</button>
+      </div>
+    </section>
+
+    <section id="screen-flag-review" class="screen" hidden>
+      <div class="card">
+        <h1>Review flagged questions</h1>
+        <p class="muted">Check each flagged question before you submit. You can return to any question or finish the session.</p>
+        <div id="flagged-list"></div>
+        <div class="exam-nav"><button class="btn" id="btn-review-back">Go back to exam</button><button class="btn btn-success" id="btn-review-finish">Finish Exam</button></div>
       </div>
     </section>
 
@@ -96,8 +108,17 @@
       <div id="review-list"></div>
 
       <div class="exam-nav">
+        <button class="btn" id="btn-retry-missed" hidden>Retry missed questions</button>
         <button class="btn btn-primary btn-lg" id="btn-restart">New Session</button>
       </div>
+    </section>
+  </div>
+
+  <div id="finish-dialog" class="dialog-scrim" hidden>
+    <section class="finish-dialog" role="dialog" aria-modal="true" aria-labelledby="finish-dialog-title" aria-describedby="finish-warning">
+      <h2 id="finish-dialog-title">Finish this exam?</h2>
+      <p id="finish-warning"></p>
+      <div class="dialog-actions"><button class="btn btn-success" id="btn-finish-anyway">Finish anyway</button><button class="btn" id="btn-finish-cancel">Go back</button></div>
     </section>
   </div>
 

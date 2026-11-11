@@ -15,6 +15,18 @@
   document.addEventListener('DOMContentLoaded', function () {
     var nav = document.querySelector('.site-nav-inner');
     if (!nav) return;
+    var menu = document.createElement('button');
+    menu.className = 'site-menu-btn';
+    menu.type = 'button';
+    menu.textContent = '☰';
+    menu.setAttribute('aria-label', 'Open site navigation');
+    menu.setAttribute('aria-expanded', 'false');
+    menu.addEventListener('click', function () {
+      var open = nav.classList.toggle('nav-open');
+      menu.setAttribute('aria-expanded', String(open));
+      menu.setAttribute('aria-label', open ? 'Close site navigation' : 'Open site navigation');
+    });
+    nav.appendChild(menu);
     var btn = document.createElement('button');
     btn.className = 'theme-btn';
     btn.type = 'button';

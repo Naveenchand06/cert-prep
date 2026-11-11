@@ -21,7 +21,8 @@
     <header class="topbar">
       <button class="icon-btn nav-toggle" @click="navOpen = !navOpen" aria-label="Sections">☰</button>
       <a class="brand" href="index.html"><span class="brand-logo">☁️</span> Cloud Certs Lab</a>
-      <nav class="site-links">
+      <button class="icon-btn menu-toggle" @click="linksOpen = !linksOpen" :aria-expanded="linksOpen" aria-label="Site navigation">☰</button>
+      <nav class="site-links" :class="{ open: linksOpen }">
         <a href="saa.html">Practice Exam</a>
         <a href="study-guide.html">Ways to Quickly Pass SAA</a>
         <a class="active" href="cheatsheet.html">Cheatsheet</a>

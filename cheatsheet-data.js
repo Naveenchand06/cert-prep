@@ -1,7 +1,7 @@
 /* Cheatsheet content. Cells are small HTML snippets (<strong>, <em>, <code>, pills).
    Service names and key terms are linked/highlighted automatically at load time (see cheatsheet.js).
    Block types: note | h3 | table {cols, rows} | callout {tip, paras} | directory */
-window.CS_INTRO = ["<strong>How to use this page:</strong> (1) Read sections 0–3 closely: they decide most questions. (2) Skim the service sections and mark anything that surprises you. (3) Do 3–4 full practice runs in the <a href=\"index.html\">practice exam</a> and look up every miss here with the search box. (4) Once you score <strong>80%+ twice in a row</strong>, read sections 0, 1, 2 and 17 again and book the exam.", "<strong>Find the adjective first</strong> (cheapest, least overhead, lowest latency, survives a Region failure), then pick the service built for it. Usually two options would both work. The right one matches the adjective."];
+window.CS_INTRO = ["<strong>How to use this page:</strong> (1) Read sections 0–3 closely: they decide most questions. (2) Skim the service sections and mark anything that surprises you. (3) Do 3–4 full practice runs in the <a href=\"saa.html\">practice exam</a> and look up every miss here with the search box. (4) Once you score <strong>80%+ twice in a row</strong>, read sections 0, 1, 2 and 17 again and book the exam.", "<strong>Find the adjective first</strong> (cheapest, least overhead, lowest latency, survives a Region failure), then pick the service built for it. Usually two options would both work. The right one matches the adjective."];
 
 window.CS_SECTIONS = [
   { num: 0, title: "The exam right now", group: "Exam strategy", blocks: [

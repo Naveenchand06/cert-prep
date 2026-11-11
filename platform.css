@@ -87,3 +87,4 @@
 .reset-row { display: flex; justify-content: flex-end; margin-top: 13px; }
 .empty-note { padding: 14px; color: var(--muted); font-size: .83rem; }
 @media (max-width: 760px) { .path-grid, .cka-grid { grid-template-columns: 1fr; }.platform-shell { padding-top: 42px; }.path-card { min-height: 330px; }.cka-heading { flex-direction: column; }.command-table th:nth-child(2), .command-table td:nth-child(2) { display: none; } }
+@media (max-width: 480px) { .cka-card .domain-row { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }.domain-meta, .domain-foot { min-width: 0; flex-wrap: wrap; }.domain-foot { gap: 5px 12px; } }

@@ -572,8 +572,17 @@ tr:hover .flag-btn, .svc-card:hover .flag-btn { opacity: .9; }
   .scrim { display: block; position: fixed; inset: 58px 0 0; z-index: 45; background: rgba(0, 0, 0, .45); }
   .main { padding: 20px 18px 70px; }
 }
+@media (min-width: 821px) { .menu-toggle { display: none; } }
 @media (max-width: 820px) {
+  .topbar { gap: 6px; padding: 0 8px; }
+  .brand { font-size: .9rem; }
+  .nav-toggle, .menu-toggle { width: 32px; height: 32px; flex: 0 0 32px; }
   .site-links { display: none; }
+  .site-links.open { position: absolute; top: 57px; left: 8px; right: 8px; z-index: 60; display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 8px; border: 1px solid var(--border); border-radius: 0 0 12px 12px; background: var(--bg); box-shadow: var(--shadow); }
+  .site-links.open a { display: block; }
+  .menu-toggle { display: inline-flex; }
+  .topbar-actions { gap: 4px; }
+  .topbar-actions .icon-btn { width: 32px; height: 32px; }
   .intro-grid, .legend { grid-template-columns: 1fr; }
   .hero { padding: 22px 18px; }
   .hero h1 { font-size: 1.75rem; }

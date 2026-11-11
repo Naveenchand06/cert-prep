@@ -214,6 +214,7 @@
         tip: null,          // { svc, x, y, above }
         modal: null,        // service shown in the modal
         navOpen: false,
+        linksOpen: false,
         showTop: false,
         cloudfrontId: SERVICES.filter(function (s) { return s.n === 'Amazon CloudFront'; })[0].id,
       };

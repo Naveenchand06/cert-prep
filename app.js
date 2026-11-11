@@ -15,12 +15,16 @@ const state = {
   current: 0,
   startedAt: null,
   timerId: null,
+  timed: false,
+  deadline: null,
+  timeExpired: false,
+  flags: new Set(),
   count: 10,
   topics: new Set(),   // empty = all topics
 };
 
 const $ = (id) => document.getElementById(id);
-const screens = { start: $("screen-start"), exam: $("screen-exam"), results: $("screen-results") };
+const screens = { start: $("screen-start"), exam: $("screen-exam"), "flag-review": $("screen-flag-review"), results: $("screen-results") };
 
 function showScreen(name) {
   Object.entries(screens).forEach(([k, el]) => (el.hidden = k !== name));
@@ -133,9 +137,11 @@ function renderCounts() {
     const btn = document.createElement("button");
     btn.className = "count-btn" + (n === state.count ? " selected" : "");
     btn.textContent = n === poolSize ? `All (${n})` : String(n);
+    btn.disabled = $("timed-mode").checked;
     btn.onclick = () => { state.count = n; renderCounts(); };
     wrap.appendChild(btn);
   });
+  wrap.classList.toggle("disabled", $("timed-mode").checked);
 }
 
 function renderCoverage() {
@@ -157,8 +163,11 @@ function renderPoolNote() {
   const label = state.topics.size === 0
     ? "all topics"
     : `${state.topics.size} topic${state.topics.size > 1 ? "s" : ""}`;
-  $("pool-note").textContent = `Drawing ${state.count} question${state.count > 1 ? "s" : ""} from ${pool.length} available in ${label}.`;
-  $("btn-start").disabled = pool.length === 0;
+  const timed = $("timed-mode").checked;
+  $("pool-note").textContent = timed
+    ? `Timed mode draws 65 questions from the full bank (${QUESTION_BANK.length} available), with a 130-minute countdown.`
+    : `Drawing ${state.count} question${state.count > 1 ? "s" : ""} from ${pool.length} available in ${label}.`;
+  $("btn-start").disabled = timed ? QUESTION_BANK.length < 65 : pool.length === 0;
 }
 
 function renderStart() {
@@ -192,15 +201,21 @@ function saveHistory(score, total) {
 }
 
 // ---------- Exam ----------
-function startExam() {
-  const pool = filteredPool();
+function startExam(questions = null) {
+  const timed = !questions && $("timed-mode").checked;
+  const pool = questions || (timed ? QUESTION_BANK : filteredPool());
   if (!pool.length) return;
-  state.questions = drawQuestions(pool, Math.min(state.count, pool.length))
+  const count = questions ? questions.length : timed ? 65 : Math.min(state.count, pool.length);
+  state.questions = (questions ? shuffle(pool) : drawQuestions(pool, count))
     .map((q) => ({ ...q, options: shuffle(q.options) }));
-  recordSeen(state.questions);
+  if (!questions) recordSeen(state.questions);
   state.answers = state.questions.map(() => new Set());
+  state.flags = new Set();
   state.current = 0;
   state.startedAt = Date.now();
+  state.timed = timed;
+  state.deadline = timed ? Date.now() + 130 * 60 * 1000 : null;
+  state.timeExpired = false;
   state.timerId = setInterval(updateTimer, 1000);
   updateTimer();
   renderQuestion();
@@ -208,10 +223,14 @@ function startExam() {
 }
 
 function updateTimer() {
-  const secs = Math.floor((Date.now() - state.startedAt) / 1000);
+  const secs = state.timed
+    ? Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000))
+    : Math.floor((Date.now() - state.startedAt) / 1000);
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
   $("exam-timer").textContent = `${mm}:${ss}`;
+  $("exam-timer").classList.toggle("timer-warning", state.timed && secs <= 300);
+  if (state.timed && secs === 0) { state.timeExpired = true; clearInterval(state.timerId); showFlagReviewOrResults(); }
 }
 
 function renderQuestion() {
@@ -249,12 +268,16 @@ function renderQuestion() {
   });
 
   $("btn-prev").disabled = state.current === 0;
+  const flagButton = $("btn-flag");
+  flagButton.setAttribute("aria-pressed", state.flags.has(state.current));
+  flagButton.textContent = state.flags.has(state.current) ? "★ Flagged for review" : "☆ Flag for review";
   const isLast = state.current === total - 1;
   $("btn-next").hidden = isLast;
   $("btn-finish").hidden = !isLast;
 }
 
 function toggleOption(i) {
+  if (state.timeExpired) return;
   const q = state.questions[state.current];
   const selected = state.answers[state.current];
   if (q.pick === 1) {
@@ -272,11 +295,32 @@ function toggleOption(i) {
   renderQuestion();
 }
 
-function finishExam() {
+function requestFinish() {
   const unanswered = state.answers.filter((s) => s.size === 0).length;
-  if (unanswered > 0 && !confirm(`${unanswered} question(s) are unanswered and will be marked wrong. Finish anyway?`)) {
-    return;
-  }
+  if (!unanswered) return showFlagReviewOrResults();
+  $("finish-warning").textContent = `${unanswered} question${unanswered === 1 ? " is" : "s are"} unanswered and will be marked wrong.`;
+  $("finish-dialog").hidden = false;
+  $("btn-finish-anyway").focus();
+}
+
+function showFlagReviewOrResults() {
+  const indexes = [...state.flags].sort((a, b) => a - b);
+  if (!indexes.length) return finishExam();
+  $("flagged-list").innerHTML = indexes.map((index) => {
+    const q = state.questions[index];
+    const status = state.answers[index].size ? "Answered" : "Unanswered";
+    return `<div class="flag-review-row"><span><b>Q${index + 1} · ${q.topic}</b><br><span class="muted">${status} · ${q.question}</span></span><button class="btn btn-small" data-review="${index}">Review</button></div>`;
+  }).join("");
+  $("flagged-list").querySelectorAll("[data-review]").forEach((button) => button.onclick = () => {
+    state.current = Number(button.dataset.review);
+    renderQuestion();
+    showScreen("exam");
+  });
+  showScreen("flag-review");
+}
+
+function finishExam() {
+  $("finish-dialog").hidden = true;
   clearInterval(state.timerId);
   renderResults();
   showScreen("results");
@@ -384,14 +428,31 @@ function renderResults() {
     .join("");
 
   saveHistory(score, total);
+  const retry = $("btn-retry-missed");
+  retry.hidden = !grades.some((grade) => grade !== "correct");
+  retry.onclick = () => {
+    const missed = state.questions.filter((q, qi) => gradeQuestion(q, state.answers[qi]) !== "correct");
+    startExam(missed);
+  };
 }
 
 // ---------- Wire up ----------
 $("btn-start").onclick = startExam;
 $("btn-prev").onclick = () => { state.current--; renderQuestion(); };
 $("btn-next").onclick = () => { state.current++; renderQuestion(); };
-$("btn-finish").onclick = finishExam;
+$("btn-finish").onclick = requestFinish;
+$("btn-flag").onclick = () => {
+  if (state.timeExpired) return;
+  if (state.flags.has(state.current)) state.flags.delete(state.current);
+  else state.flags.add(state.current);
+  renderQuestion();
+};
+$("btn-finish-anyway").onclick = () => { $("finish-dialog").hidden = true; showFlagReviewOrResults(); };
+$("btn-finish-cancel").onclick = () => { $("finish-dialog").hidden = true; $("btn-finish").focus(); };
+$("btn-review-back").onclick = () => { renderQuestion(); showScreen("exam"); };
+$("btn-review-finish").onclick = finishExam;
 $("btn-restart").onclick = () => { renderStart(); showScreen("start"); };
+$("timed-mode").onchange = () => { renderCounts(); renderPoolNote(); };
 $("btn-reset-seen").onclick = () => {
   if (confirm("Reset which questions you've been served? Your score history is kept.")) {
     localStorage.removeItem(SEEN_KEY);
