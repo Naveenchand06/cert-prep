@@ -1,89 +1,82 @@
-# AWS Certs Prep — SAA-C03 Practice Exams
+# Cloud Certs Lab
 
-A lightweight practice-exam app for the **AWS Solutions Architect – Associate (SAA-C03)** exam. No build step. The practice exam works offline; the cheatsheet loads Vue 3 and fonts from a CDN.
+A browser-based study workspace for **AWS Solutions Architect – Associate (SAA-C03)** and **Certified Kubernetes Administrator (CKA)**. The original AWS practice app remains available alongside a new CKA workspace with exam-weighted progress, kubectl drills, and hands-on practice tasks.
 
-## Run it
+## Run locally
 
-Option 1 — just open the file:
+No build step is required. Open `index.html`, or serve the directory for reliable browser storage and navigation:
 
-```
-open index.html
-```
-
-Option 2 — serve it (nicer URLs, same thing):
-
-```
+```sh
 python3 -m http.server 8111
-# then visit http://localhost:8111
+# open http://localhost:8111
 ```
 
 ## Pages
 
-| Page | What it's for |
+| Page | Purpose |
 |---|---|
-| [index.html](index.html) | The practice exam &mdash; topic filter, no-repeat question selection, partial-credit grading |
-| [study-guide.html](study-guide.html) | Course triage: which lectures to Study / Skim / Drop |
-| [cheatsheet.html](cheatsheet.html) | One-stop SAA-C03 cheatsheet for people who already use AWS (Vue 3 app, dark theme by default). Exam format, constraint words, keyword &rarr; service, scenario patterns, cost ladders, per-domain deep facts, numbers, traps, exam-day playbook, plus a **Service directory** of ~160 services, each with its category, a one-word purpose and how it's run (Serverless / Managed / Self-managed / Tool). Service names anywhere on the page show that card on hover. Constraint words, numbers and negations are highlighted. Search everything (`/`), flag rows to revisit, mark sections read. |
+| `index.html` | Certification path picker: AWS SAA or CKA |
+| `pages/saa.html` | SAA-C03 practice exams |
+| `pages/study-guide.html` | SAA course triage guide |
+| `pages/cheatsheet.html` | SAA dark-first interactive cheatsheet and service directory |
+| `pages/cka.html` | CKA study dashboard, domains, command drills and practice tasks |
 
-## Features
+## Project structure
 
-- **Topic filter** — practice one or more of the 12 study topics (e.g. just Databases + VPC), or all topics. Question counts adapt to the filtered pool.
-- **No repeats until you've seen everything** — each question has a stable id and the app tracks how many times you've been served it. New sessions draw from the least-seen questions first, so you cycle the entire (filtered) bank before anything comes back. A coverage bar on the start screen shows how much you've worked through, with a reset button.
-- Choose session length: 5, 10, 15, 25, 50, or the whole pool
-- Option order is randomized every session, like the real exam
-- Single-answer and "Choose TWO" multiple-response questions — multi questions are clearly flagged with an orange **Multiple response** badge and checkbox-style options
-- Timer and progress bar while you practice
-- Results screen with:
-  - Overall score against the real exam pass mark (~72%)
-  - Three-way grading: **Correct**, **Partially correct** (some but not all right answers on a multiple-response question), and **Incorrect** — with missed correct answers called out. Note: the real exam gives no credit for partial answers; the % score here counts fully correct answers only.
-  - Breakdown by exam domain **and by topic (weakest first)**, so you know exactly what to filter on next session
-  - Full answer review — every option annotated with a one-liner on why it's right or wrong
-- Last 5 session scores kept in browser localStorage
-
-## Editing the cheatsheet
-
-- Content lives in [cheatsheet-data.js](cheatsheet-data.js): sections made of `note`, `h3`, `table` and `callout` blocks. Cells are small HTML snippets.
-- The service directory lives in [services.js](services.js). Each entry has a category, a one-word purpose (`u`), a type (`t`), a one-liner, an exam cue, and the aliases used to auto-link it in the text.
-- Service links and keyword highlights are added automatically at load time ([cheatsheet.js](cheatsheet.js)), so plain text in the data files is enough.
-
-## Question bank
-
-All questions live in [questions.js](questions.js) — currently **184 questions**, organized by topic and tagged with their exam domain.
-
-**Topics** (the filter chips on the start screen):
-
-| Topic | Qs | Topic | Qs |
-|---|---|---|---|
-| IAM & Identity | 14 | Storage | 19 |
-| Data Protection & Encryption | 13 | Databases | 19 |
-| Network & Edge Security | 14 | Decoupling & Integration | 16 |
-| VPC & Hybrid Connectivity | 16 | Analytics & Data Pipelines | 12 |
-| DNS, CDN & Global Traffic | 13 | Migration & Transfer | 12 |
-| Compute, Containers & Scaling | 18 | Cost Management & Governance | 18 |
-
-**Exam domains** (used for the results breakdown, weighted like the real exam):
-
-1. Design Secure Architectures (~30% of the real exam)
-2. Design Resilient Architectures (~26%)
-3. Design High-Performing Architectures (~24%)
-4. Design Cost-Optimized Architectures (~20%)
-
-### Adding questions
-
-Append an object to `QUESTION_BANK` in `questions.js`:
-
-```js
-{
-  topic: "Databases",                      // one of the TOPICS listed at the top of the file
-  domain: "Design Secure Architectures",   // one of the four domains above
-  pick: 1,                                  // 1 = single answer, 2 = "Choose TWO"
-  question: "Your question text?",
-  options: [
-    { text: "Right answer", correct: true,  why: "One-liner why it's correct." },
-    { text: "Wrong answer", correct: false, why: "One-liner why it's wrong." },
-    // ... 4-5 options total
-  ],
-}
+```text
+cert-prep/
+├── index.html          # Entry point: certification path picker
+├── pages/              # All other pages (cka, saa, study-guide, cheatsheet)
+├── css/                # Stylesheets: style.css (shared/SAA), platform.css (home + CKA), cheatsheet.css
+├── js/                 # Scripts: theme.js, app.js, questions.js, guide.js, services.js,
+│                       #   cheatsheet.js, cheatsheet-data.js, cka.js
+└── README.md
 ```
 
-`pick` must equal the number of options marked `correct: true`. The app picks up new questions automatically — no other changes needed. Question ids are hashed from the question text, so editing a question's wording makes the app treat it as unseen.
+## Framework choice
+
+The path picker and CKA workspace use **Vue 3** from its production CDN build. Vue fits the interactive progress view, command filters, and revealable practice solutions while keeping this content-first project static and easy to host. The existing SAA app remains plain JavaScript; its cheatsheet already uses Vue 3. There is no package manager or build output to maintain.
+
+The site is configured as a static site for Vercel: import the repository, use the **Other** framework preset, leave the build command blank, and use `.` as the output directory. No server-side routes or API keys are required. Vue, fonts, and the cheatsheet's framework load from CDNs, so those features require a network connection; the SAA question bank itself is local.
+
+## CKA study workspace
+
+The CKA page uses the current Linux Foundation domain weights and includes progress by domain and a weighted readiness score. Progress is local to the browser and records tasks marked mastered. The task prompts are original study exercises shaped by the published curriculum and common public lab patterns; they are not actual exam dumps. Practice in a disposable Kubernetes lab before running cluster-changing commands.
+
+The **Node paths & etcd** tab covers kubeadm's usual control-plane static Pod manifests, kubelet files, kubeconfigs, PKI, etcd data directory, node process inspection over SSH, and a TLS-authenticated etcd snapshot example. Paths are defaults: inspect the designated host and component manifest/config when a task or cluster differs. Kubernetes documents kubeadm static Pods under `/etc/kubernetes/manifests`; it warns to keep backups outside that watched directory.
+
+The CKA objective explicitly includes creating and managing clusters with kubeadm, and Linux Foundation exam instructions describe SSH to a designated host for each task. Public exam guidance does not guarantee that every prebuilt cluster is exclusively kubeadm-created, so this guide teaches the kubeadm defaults while prompting you to verify the actual host configuration.
+
+Current domain weights:
+
+| Domain | Weight |
+|---|---:|
+| Troubleshooting | 30% |
+| Cluster Architecture, Installation & Configuration | 25% |
+| Services & Networking | 20% |
+| Workloads & Scheduling | 15% |
+| Storage | 10% |
+
+The command drills cover context/namespace handling, imperative generators, inspect/debug patterns, rollout and node maintenance, and concise output. `k` and shell completion are common exam conveniences; confirm the environment instead of assuming aliases are configured.
+
+### CKA references
+
+- [Linux Foundation CKA exam page and curriculum](https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/)
+- [KodeKloud CKA course](https://kodekloud.com/courses/cka-certification-course-certified-kubernetes-administrator/) — labs and imperative command practice
+- [KodeKloud CKA learning path](https://pages.kodekloud.com/learning-path/cka)
+- [TechiesCamp public practice question guide](https://github.com/techiescamp/cka-certification-guide/blob/main/PRACTICE_QUESTIONS.md)
+- [chadmcrowell CKA Exercises](https://github.com/chadmcrowell/CKA-Exercises)
+- [Killercoda Kubernetes playgrounds](https://killercoda.com/playgrounds)
+- [Kubernetes kubeadm implementation details and default paths](https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/)
+- [Kubernetes static Pod manifests](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/)
+- [Kubernetes etcd snapshot and restore guide](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
+
+The public question repositories are linked as external study materials rather than copied into this repo; check each repository's license and attribution before reusing its content.
+
+## SAA question bank
+
+All SAA questions remain in `js/questions.js`. `pages/saa.html` provides the topic-filtered practice exam, coverage tracking, randomized choices, partial-credit review, and session history. The SAA cheatsheet content is in `js/cheatsheet-data.js`, with its service directory in `js/services.js`.
+
+## Deploy to Vercel
+
+This is a static multi-page site. In Vercel, select **Other** as the framework preset, leave build and install commands empty, and set the output directory to `.`. The default URLs (`/`, `/pages/saa.html`, `/pages/cka.html`, and supporting pages) need no rewrite configuration.
