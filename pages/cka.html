@@ -94,22 +94,55 @@ k get pod web -o yaml</pre><button class="copy-btn" @click="copy('k run web --im
       <div>
         <article class="cka-card">
           <h2>kubeadm node paths</h2><p class="cka-subtitle">These are kubeadm defaults. Run host-level commands on the task's designated node over SSH; paths can vary with cluster configuration.</p>
-          <div style="overflow-x:auto"><table class="command-table"><thead><tr><th>Component / data</th><th>Default path</th><th>Where / notes</th></tr></thead><tbody>
+          <div class="path-table-wrap"><table class="command-table path-table"><thead><tr><th>Component / data</th><th>Default path</th><th>Where / notes</th></tr></thead><tbody>
             <tr><td>API server manifest</td><td><code>/etc/kubernetes/manifests/kube-apiserver.yaml</code></td><td>Control-plane node; static Pod manifest</td></tr>
-            <tr><td>Controller manager manifest</td><td><code>/etc/kubernetes/manifests/kube-controller-manager.yaml</code></td><td>Control-plane node; static Pod manifest</td></tr>
+            <tr><td>Controller manager manifest</td><td><code>/etc/kubernetes/manifests/kube-controller-manager.yaml</code></td><td>Control-plane node; static Pod manifest. Its arguments and mounted config are declared here.</td></tr>
+            <tr><td>Controller manager kubeconfig</td><td><code>/etc/kubernetes/controller-manager.conf</code></td><td>Control-plane node; identity and API connection used by the component</td></tr>
             <tr><td>Scheduler manifest</td><td><code>/etc/kubernetes/manifests/kube-scheduler.yaml</code></td><td>Control-plane node; static Pod manifest</td></tr>
+            <tr><td>Scheduler kubeconfig</td><td><code>/etc/kubernetes/scheduler.conf</code></td><td>Control-plane node; identity and API connection used by the component</td></tr>
             <tr><td>Local etcd manifest</td><td><code>/etc/kubernetes/manifests/etcd.yaml</code></td><td>Control-plane node only with stacked/local etcd</td></tr>
-            <tr><td>Static Pod directory</td><td><code>/etc/kubernetes/manifests/</code></td><td>Default kubelet <code>staticPodPath</code>; verify in kubelet config</td></tr>
-            <tr><td>Kubelet config</td><td><code>/var/lib/kubelet/config.yaml</code></td><td>Present on every node</td></tr>
+            <tr><td>Static Pod directory</td><td><code>/etc/kubernetes/manifests/</code></td><td>Usual kubeadm <code>staticPodPath</code>. Create Pod YAML on the node where that kubelet runs.</td></tr>
+            <tr><td>Kubelet config</td><td><code>/var/lib/kubelet/config.yaml</code></td><td>Usual kubeadm ComponentConfig path on every node; service may pass another <code>--config</code></td></tr>
             <tr><td>Kubelet kubeadm args</td><td><code>/var/lib/kubelet/kubeadm-flags.env</code></td><td>Runtime endpoint and node flags; every node</td></tr>
-            <tr><td>Kubelet service/drop-ins</td><td><code>systemctl cat kubelet</code></td><td>Shows effective unit and drop-in paths; varies by OS/package</td></tr>
-            <tr><td>Kubeconfigs</td><td><code>/etc/kubernetes/admin.conf</code>, <code>controller-manager.conf</code>, <code>scheduler.conf</code>, <code>kubelet.conf</code></td><td>Control plane; kubelet.conf also exists on workers</td></tr>
+            <tr><td>Kubelet service/drop-ins</td><td><code>systemctl cat kubelet</code></td><td>Shows effective unit and drop-in paths; inspect before editing because OS/package layouts vary</td></tr>
+            <tr><td>Kubelet extra args</td><td><code>/etc/default/kubelet</code> or <code>/etc/sysconfig/kubelet</code></td><td>Optional overrides on Debian-family or RPM-family systems; may not exist</td></tr>
+            <tr><td>Kubelet certificates</td><td><code>/var/lib/kubelet/pki/</code></td><td>Typical node-local kubelet certificates; names and setup can vary</td></tr>
+            <tr><td>Other kubeconfigs</td><td><code>/etc/kubernetes/admin.conf</code>, <code>/etc/kubernetes/kubelet.conf</code></td><td>Admin access on control plane; kubelet identity config on every node</td></tr>
             <tr><td>Certificates and keys</td><td><code>/etc/kubernetes/pki/</code>, <code>/etc/kubernetes/pki/etcd/</code></td><td>Control plane; protect private keys</td></tr>
             <tr><td>Stacked etcd data</td><td><code>/var/lib/etcd/</code></td><td>Default local etcd dataDir; inspect manifest first</td></tr>
             <tr><td>kubeadm cluster config</td><td><code>kube-system/kubeadm-config</code> ConfigMap</td><td>Read with kubectl; not a node file</td></tr>
             <tr><td>kube-proxy / CoreDNS</td><td><code>kube-system</code> ConfigMaps and workloads</td><td>Usually DaemonSet / Deployment config, not control-plane static Pods</td></tr>
           </tbody></table></div>
-          <div class="tip" style="margin-top:14px"><strong>Static Pod edit:</strong> back up manifests outside <code>/etc/kubernetes/manifests</code>. Kubelet reads every non-hidden file in the watched directory; a <code>.bak</code> copy there can cause an unintended Pod. Edit the manifest on the node, then watch kubelet recreate the Pod.</div>
+          <div class="tip" style="margin-top:14px"><strong>Static Pod edit:</strong> back up manifests outside <code>/etc/kubernetes/manifests</code>. Kubelet reads every non-hidden file in the watched directory, regardless of extension; a <code>.bak</code> copy there can create another Pod or interfere with the intended one.</div>
+        </article>
+        <article class="cka-card">
+          <h2>Create a static Pod manifest</h2>
+          <p class="cka-subtitle">SSH to the node where the Pod should run, then save a normal Pod YAML file inside that node's kubelet <code>staticPodPath</code>. With the usual kubeadm setup, that directory is <code>/etc/kubernetes/manifests/</code>.</p>
+          <div class="code-wrap"><pre>ssh &lt;node-named-by-task&gt;
+sudo install -d -m 755 /etc/kubernetes/manifests
+sudoedit /etc/kubernetes/manifests/static-web.yaml</pre></div>
+          <p class="cka-subtitle">Put this Pod definition in the editor, save the file, and exit:</p>
+          <div class="code-wrap"><pre>apiVersion: v1
+kind: Pod
+metadata:
+  name: static-web
+  labels:
+    app: static-web
+spec:
+  containers:
+  - name: web
+    image: nginx:1.27
+    ports:
+    - containerPort: 80</pre></div>
+          <div class="code-wrap"><pre># Kubelet notices the file and starts the Pod on this node
+sudo crictl pods
+k get pods -A -o wide | grep static-web
+
+# Verify the selected directory and kubelet health
+sudo grep -n 'staticPodPath' /var/lib/kubelet/config.yaml
+sudo systemctl status kubelet --no-pager
+sudo journalctl -u kubelet -n 50 --no-pager</pre></div>
+          <div class="tip"><strong>What to expect:</strong> kubelet runs the static Pod directly and the API server shows a mirror Pod, commonly named <code>static-web-&lt;node&gt;</code>. Manage it by editing or removing the local manifest, not with <code>kubectl apply</code> or <code>kubectl delete</code>. If the task uses a different <code>staticPodPath</code> or the deprecated <code>--pod-manifest-path</code> flag, use the configured location.</div>
         </article>
         <article class="cka-card">
           <h2>Inspect processes on the task node</h2><p class="cka-subtitle">Follow the task's host instruction (for example, <code>ssh controlplane</code>) and elevate if needed. Repeat on each node named by the task.</p>
@@ -134,9 +167,16 @@ ps -ef | grep -E '[k]ubelet|[k]ube-apiserver|[k]ube-scheduler|[k]ube-controller-
 k get pods -n kube-system -o wide
 k describe pod kube-apiserver-&lt;node&gt; -n kube-system
 
-# Check kubelet's actual static manifest path
-grep -n 'staticPodPath' /var/lib/kubelet/config.yaml</pre></div>
-          <p class="cka-subtitle" style="margin:10px 0 0">If <code>crictl</code> cannot find the runtime socket, inspect <code>systemctl cat kubelet</code> and <code>/var/lib/kubelet/kubeadm-flags.env</code> for its configured CRI endpoint. Workers normally run kubelet and workload containers; control-plane components are usually absent.</p>
+# Check the service's config path and kubelet's static manifest directory
+systemctl show kubelet -p FragmentPath -p DropInPaths
+systemctl cat kubelet
+grep -n 'staticPodPath' /var/lib/kubelet/config.yaml
+
+# Inspect the controller-manager static Pod and its container logs
+grep -nE 'image:|command:|kubeconfig|config' /etc/kubernetes/manifests/kube-controller-manager.yaml
+crictl ps -a --name kube-controller-manager
+crictl logs &lt;container-id&gt;</pre></div>
+          <p class="cka-subtitle" style="margin:10px 0 0">If the service uses a config file other than <code>/var/lib/kubelet/config.yaml</code>, inspect the file named by its <code>--config</code> argument. If <code>crictl</code> cannot find the runtime socket, inspect <code>systemctl cat kubelet</code> and <code>/var/lib/kubelet/kubeadm-flags.env</code> for its configured CRI endpoint. Workers normally run kubelet and workload containers; control-plane components are usually absent.</p>
         </article>
       </div>
       <aside>
@@ -168,6 +208,8 @@ sudo ls -lh /opt/etcd-backup/snapshot.db</pre></div>
             <a href="https://docs.linuxfoundation.org/tc-docs/certification/tips-cka-and-ckad" target="_blank" rel="noopener">Linux Foundation · exam host instructions <span>↗</span></a>
             <a href="https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/" target="_blank" rel="noopener">Kubernetes · kubeadm file paths <span>↗</span></a>
             <a href="https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/" target="_blank" rel="noopener">Kubernetes · static Pod behavior <span>↗</span></a>
+            <a href="https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/kubelet-integration/" target="_blank" rel="noopener">Kubernetes · kubeadm and kubelet files <span>↗</span></a>
+            <a href="https://kubernetes.io/docs/reference/node/kubelet-files/" target="_blank" rel="noopener">Kubernetes · kubelet local files and paths <span>↗</span></a>
             <a href="https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/" target="_blank" rel="noopener">Kubernetes · etcd snapshot and restore <span>↗</span></a>
           </div>
         </article>
