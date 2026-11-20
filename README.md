@@ -1,10 +1,8 @@
 # Cloud Certs Lab
 
-A browser-based study workspace for **AWS Solutions Architect – Associate (SAA-C03)** and **Certified Kubernetes Administrator (CKA)**. The original AWS practice app remains available alongside a new CKA workspace with exam-weighted progress, kubectl drills, and hands-on practice tasks.
+A browser-based study workspace for **Certified Kubernetes Administrator (CKA)** and **AWS Solutions Architect – Associate (SAA-C03)**. It is a static site with no build step, deployed on GitHub Pages (`cert-prep.naveenops.com`).
 
 ## Run locally
-
-No build step is required. Open `index.html`, or serve the directory for reliable browser storage and navigation:
 
 ```sh
 python3 -m http.server 8111
@@ -15,68 +13,62 @@ python3 -m http.server 8111
 
 | Page | Purpose |
 |---|---|
-| `index.html` | Certification path picker: AWS SAA or CKA |
+| `index.html` | Certification path picker |
+| `pages/cka.html` | CKA workspace: topics, command drill, mock exam |
 | `pages/saa.html` | SAA-C03 practice exams |
-| `pages/study-guide.html` | SAA course triage guide |
-| `pages/cheatsheet.html` | SAA dark-first interactive cheatsheet and service directory |
-| `pages/cka.html` | CKA study dashboard, domains, command drills and practice tasks |
+| `pages/cheatsheet.html` | SAA interactive cheatsheet and service directory |
 
-## Project structure
+## CKA workspace
 
-```text
-cert-prep/
-├── index.html          # Entry point: certification path picker
-├── pages/              # All other pages (cka, saa, study-guide, cheatsheet)
-├── css/                # Stylesheets: style.css (shared/SAA), platform.css (home + CKA), cheatsheet.css
-├── js/                 # Scripts: theme.js, app.js, questions.js, guide.js, services.js,
-│                       #   cheatsheet.js, cheatsheet-data.js, cka.js
-└── README.md
-```
+Built with **Vue 3** (CDN global build) and hash routing, so it still deploys as plain static files. Routes:
 
-## Framework choice
+- `#/`: dashboard with official domain weights, weighted readiness and the study path
+- `#/topic/<id>/<tab>`: one topic, with tabs **Learn** (concepts, reference tables, exam traps), **Commands** (grouped, copy buttons, quiz mode that hides commands, "known" tracking), **YAML** templates, **Labs** (task → hidden solution → verify step, mark mastered) and **Docs**
+- `#/drill`: flashcards. You get a description, type the command, reveal and grade yourself; missed commands come back more often
+- `#/mock`: random labs weighted by exam domain, with a timer (default 16 tasks / 120 min), self-marking, pass/fail against 66% and history
 
-The path picker and CKA workspace use **Vue 3** from its production CDN build. Vue fits the interactive progress view, command filters, and revealable practice solutions while keeping this content-first project static and easy to host. The existing SAA app remains plain JavaScript; its cheatsheet already uses Vue 3. There is no package manager or build output to maintain.
+Press `/` anywhere to search all commands, YAML, labs and concepts.
 
-The site is configured as a static site for Vercel: import the repository, use the **Other** framework preset, leave the build command blank, and use `.` as the output directory. No server-side routes or API keys are required. Vue, fonts, and the cheatsheet's framework load from CDNs, so those features require a network connection; the SAA question bank itself is local.
+### Topics (KodeKloud CKA course order)
 
-## CKA study workspace
+| # | Topic | KodeKloud section |
+|---|---|---|
+| 01 | Exam Setup & kubectl Speed (aliases, JSONPath, custom-columns) | Intro · Other Topics |
+| 02 | Core Concepts | 2 |
+| 03 | Scheduling (taints, affinity, resources, DaemonSets, static Pods, PriorityClass, admission) | 3 |
+| 04 | Logging & Monitoring | 4 |
+| 05 | Application Lifecycle (rollouts, ConfigMaps/Secrets, encryption at rest, probes, HPA/VPA, in-place resize) | 5 |
+| 06 | Cluster Maintenance (drain, kubeadm upgrade, etcd backup/restore, node paths) | 6 |
+| 07 | Security (TLS, CSR API, kubeconfig, RBAC, ServiceAccounts, securityContext, Pod Security) | 7 |
+| 08 | Storage | 8 |
+| 09 | Networking (CNI, Services, CoreDNS, Ingress, Gateway API, NetworkPolicy) | 9 |
+| 10 | Install & HA with kubeadm (prereqs, CRI/CNI/CSI) | 10–11 |
+| 11 | Helm | 13 |
+| 12 | Kustomize | 14 |
+| 13 | CRDs & Operators | 7 (2025 updates) |
+| 14 | Troubleshooting | 12 |
 
-The CKA page uses the current Linux Foundation domain weights and includes progress by domain and a weighted readiness score. Progress is local to the browser and records tasks marked mastered. The task prompts are original study exercises shaped by the published curriculum and common public lab patterns; they are not actual exam dumps. Practice in a disposable Kubernetes lab before running cluster-changing commands.
+### Adding content
 
-The **Node paths & etcd** tab covers kubeadm's usual control-plane static Pod manifests, controller-manager and scheduler kubeconfigs, kubelet config and service discovery, PKI, the etcd data directory, and a TLS-authenticated etcd snapshot example. It includes a step-by-step static Pod manifest workflow and a matching practice task. Paths are defaults: inspect the designated host and component manifest/config when a task or cluster differs. The paths table remains horizontally scrollable on narrow screens so the path column stays visible. Kubernetes documents kubeadm static Pods under `/etc/kubernetes/manifests`; it warns to keep backups outside that watched directory.
+Each topic is one file in `js/cka/topics/` that calls `CKA.topic({...})`. The schema is documented at the top of `js/cka/registry.js`. To add a topic, create the file and add a `<script>` tag for it in `pages/cka.html`. Lab `id`s are progress keys, so keep them stable. Text fields support `` `code` `` and `**bold**`.
 
-The CKA objective explicitly includes creating and managing clusters with kubeadm, and Linux Foundation exam instructions describe SSH to a designated host for each task. Public exam guidance does not guarantee that every prebuilt cluster is exclusively kubeadm-created, so this guide teaches the kubeadm defaults while prompting you to verify the actual host configuration.
+### Storage keys
 
-Current domain weights:
+`cka-mastered-v1` (mastered labs, same key as the original version), `cka-state-v2` (known commands, drill stats, last topic, mock history), `cka-mock-v2` (current mock exam).
 
-| Domain | Weight |
-|---|---:|
-| Troubleshooting | 30% |
-| Cluster Architecture, Installation & Configuration | 25% |
-| Services & Networking | 20% |
-| Workloads & Scheduling | 15% |
-| Storage | 10% |
+### Sources
 
-The command drills cover context/namespace handling, imperative generators, inspect/debug patterns, rollout and node maintenance, and concise output. `k` and shell completion are common exam conveniences; confirm the environment instead of assuming aliases are configured.
+- [Linux Foundation CKA exam page and curriculum](https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/): Kubernetes v1.37, domain weights and competencies
+- [KodeKloud CKA course](https://kodekloud.com/courses/cka-certification-course-certified-kubernetes-administrator/) and its [course notes](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA): topic structure
+- [kubernetes.io documentation](https://kubernetes.io/docs/): commands, paths and YAML
+- Practice: [Killercoda](https://killercoda.com/playgrounds), [killer.sh](https://killer.sh), [TechiesCamp guide](https://github.com/techiescamp/cka-certification-guide), [chadmcrowell CKA exercises](https://github.com/chadmcrowell/CKA-Exercises)
 
-### CKA references
+The labs are original study tasks shaped by the public curriculum. They are not exam questions. Run them in a disposable cluster.
 
-- [Linux Foundation CKA exam page and curriculum](https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/)
-- [KodeKloud CKA course](https://kodekloud.com/courses/cka-certification-course-certified-kubernetes-administrator/) — labs and imperative command practice
-- [KodeKloud CKA learning path](https://pages.kodekloud.com/learning-path/cka)
-- [TechiesCamp public practice question guide](https://github.com/techiescamp/cka-certification-guide/blob/main/PRACTICE_QUESTIONS.md)
-- [chadmcrowell CKA Exercises](https://github.com/chadmcrowell/CKA-Exercises)
-- [Killercoda Kubernetes playgrounds](https://killercoda.com/playgrounds)
-- [Kubernetes kubeadm implementation details and default paths](https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/)
-- [Kubernetes static Pod manifests](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/)
-- [Kubernetes etcd snapshot and restore guide](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
+## SAA
 
-The public question repositories are linked as external study materials rather than copied into this repo; check each repository's license and attribution before reusing its content.
+Questions are in `js/questions.js` (practice exam in `pages/saa.html`), and the cheatsheet data is in `js/cheatsheet-data.js` and `js/services.js`.
 
-## SAA question bank
+## Deploy
 
-All SAA questions remain in `js/questions.js`. `pages/saa.html` provides the topic-filtered practice exam, coverage tracking, randomized choices, partial-credit review, and session history. The SAA cheatsheet content is in `js/cheatsheet-data.js`, with its service directory in `js/services.js`.
-
-## Deploy to Vercel
-
-This is a static multi-page site. In Vercel, select **Other** as the framework preset, leave build and install commands empty, and set the output directory to `.`. The default URLs (`/`, `/pages/saa.html`, `/pages/cka.html`, and supporting pages) need no rewrite configuration.
+GitHub Pages serves the repo as is. To use Vercel instead: import the repo, choose the **Other** preset, leave the build command empty, and set the output directory to `.`.

@@ -3,236 +3,323 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="CKA study dashboard with exam-weighted topics, kubectl command drills, and hands-on practice tasks." />
+  <meta name="description" content="CKA study workspace: topic-wise kubectl commands, YAML templates, hands-on labs, command flashcards and a timed mock exam." />
   <title>CKA Study Workspace — Cloud Certs Lab</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" />
   <link rel="stylesheet" href="../css/style.css" />
-  <link rel="stylesheet" href="../css/platform.css" />
+  <link rel="stylesheet" href="../css/cka.css" />
   <script src="../js/theme.js"></script>
 </head>
-<body>
+<body class="cka-body">
   <nav class="site-nav"><div class="site-nav-inner">
     <a class="site-brand" href="../index.html">Cloud Certs Lab</a>
-    <div class="site-links"><a class="site-link" href="../index.html">All paths</a><a class="site-link active" href="cka.html">CKA workspace</a><a class="site-link" href="saa.html">AWS SAA</a></div>
+    <div class="site-links"><a class="site-link" href="../index.html">All paths</a><a class="site-link active" href="cka.html">CKA</a><a class="site-link" href="saa.html">AWS SAA</a></div>
   </div></nav>
-  <main id="cka" class="cka-shell" v-cloak>
-    <header class="cka-heading">
-      <div><div class="kicker">CERTIFIED KUBERNETES ADMINISTRATOR</div><h1>CKA Study Workspace</h1><p>Learn the exam domains, drill the commands, then solve hands-on tasks in a Kubernetes lab. Mastery is saved on this device.</p></div>
-      <div class="callout"><strong>Exam format:</strong> 2 hours · performance-based · Kubernetes v1.37<br><span>Domain weights last checked against Linux Foundation guidance.</span></div>
-    </header>
 
-    <nav class="cka-nav" aria-label="CKA study sections">
-      <button class="cka-tab" :class="{active: view === 'overview'}" @click="view='overview'">Overview</button>
-      <button class="cka-tab" :class="{active: view === 'commands'}" @click="view='commands'">Command drills</button>
-      <button class="cka-tab" :class="{active: view === 'nodes'}" @click="view='nodes'">Node paths & etcd</button>
-      <button class="cka-tab" :class="{active: view === 'practice'}" @click="view='practice'">Practice tasks <span class="muted">({{ tasks.length }})</span></button>
-    </nav>
-
-    <section v-if="view === 'overview'" class="cka-grid">
-      <div>
-        <article class="cka-card">
-          <h2>Exam domains & your progress</h2><p class="cka-subtitle">The exam weighting helps you spend practice time where it matters. Progress is based on tasks you mark mastered.</p>
-          <div v-for="domain in domains" :key="domain.name" class="domain-row">
-            <div class="domain-meta"><span class="domain-name">{{ domain.name }}</span><span class="domain-weight">{{ domain.weight }}%</span></div>
-            <div class="mini-track"><div class="mini-fill" :style="{width: domainProgress(domain.name) + '%'}"></div></div>
-            <div class="domain-foot"><span>{{ domain.topics }}</span><b>{{ domainProgress(domain.name) }}% · {{ doneCount(domain.name) }}/{{ taskCount(domain.name) }} tasks</b></div>
-          </div>
-        </article>
-        <article class="cka-card">
-          <h2>Muscle memory checklist</h2><p class="cka-subtitle">Repeat these until the first move is automatic. Do them in a disposable cluster.</p>
-          <ul class="habit-list">
-            <li><span>01</span><span>Set the <b>context and namespace</b> before touching resources.</span></li>
-            <li><span>02</span><span>Generate a manifest with <b>--dry-run=client -o yaml</b>, then edit and apply.</span></li>
-            <li><span>03</span><span>Find failures with <b>get → describe → logs → events</b>.</span></li>
-            <li><span>04</span><span>For node work, <b>cordon → drain → upgrade/repair → uncordon</b>.</span></li>
-            <li><span>05</span><span>For storage, check <b>PVC → PV → StorageClass → pod events</b>.</span></li>
-            <li><span>06</span><span>Verify the requested state explicitly; don't stop at a successful command.</span></li>
-          </ul>
-        </article>
+  <div id="cka" class="ck-layout" v-cloak>
+    <!-- ===== Sidebar ===== -->
+    <aside class="ck-side" :class="{ open: sideOpen }">
+      <div class="ck-search">
+        <input v-model="query" type="search" placeholder="Search commands, YAML, labs…  ( / )" ref="search" @keydown.esc="query=''" aria-label="Search CKA content" />
       </div>
-      <aside>
-        <article class="cka-card">
-          <h2>Weighted readiness</h2><p class="cka-subtitle">Weighted average of task mastery by exam domain.</p>
-          <div class="readiness"><div class="readiness-number">{{ readiness }}<small>%</small></div><div class="readiness-track"><div class="readiness-fill" :style="{width: readiness + '%'}"></div></div></div>
-          <div class="callout"><strong>{{ readinessMessage }}</strong><br>Mark a task mastered only after completing it without looking at the solution.</div>
-          <div class="reset-row"><button class="small-btn" @click="resetProgress">Reset CKA progress</button></div>
-        </article>
-        <article class="cka-card">
-          <h2>Curated resources</h2><p class="cka-subtitle">Syllabus and practice sources used to shape this workspace.</p>
-          <div class="resource-list">
-            <a href="https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/" target="_blank" rel="noopener">Linux Foundation · exam domains <span>↗</span></a>
-            <a href="https://kodekloud.com/courses/cka-certification-course-certified-kubernetes-administrator/" target="_blank" rel="noopener">KodeKloud · CKA course & labs <span>↗</span></a>
-            <a href="https://kodekloud.com/community/" target="_blank" rel="noopener">KodeKloud · community practice <span>↗</span></a>
-            <a href="https://github.com/techiescamp/cka-certification-guide/blob/main/PRACTICE_QUESTIONS.md" target="_blank" rel="noopener">TechiesCamp · public practice questions <span>↗</span></a>
-            <a href="https://github.com/chadmcrowell/CKA-Exercises" target="_blank" rel="noopener">chadmcrowell · CKA exercises <span>↗</span></a>
-            <a href="https://killercoda.com/playgrounds" target="_blank" rel="noopener">Killercoda · free Kubernetes playgrounds <span>↗</span></a>
+      <nav class="ck-menu" aria-label="CKA sections">
+        <a :class="{ active: route.view==='home' && !query }" href="#/" @click="sideOpen=false"><span class="ic">🏠</span>Dashboard</a>
+        <a :class="{ active: route.view==='drill' && !query }" href="#/drill" @click="sideOpen=false"><span class="ic">🃏</span>Command drill</a>
+        <a :class="{ active: route.view==='mock' && !query }" href="#/mock" @click="sideOpen=false"><span class="ic">⏱️</span>Mock exam <span v-if="mock.active" class="ck-live">LIVE</span></a>
+      </nav>
+      <div class="ck-side-label">Study path · {{ topics.length }} topics</div>
+      <nav class="ck-topics" aria-label="Topics">
+        <a v-for="(t, i) in topics" :key="t.id" :href="'#/topic/' + t.id" @click="sideOpen=false"
+           :class="{ active: route.view==='topic' && route.id===t.id && !query }">
+          <span class="num">{{ String(i + 1).padStart(2, '0') }}</span>
+          <span class="tt">{{ t.title }}</span>
+          <span class="ring" :style="{ '--p': topicProgress(t) }" :title="topicProgress(t) + '% labs mastered'"></span>
+        </a>
+      </nav>
+    </aside>
+    <button class="ck-side-toggle" @click="sideOpen=!sideOpen" :aria-expanded="sideOpen">{{ sideOpen ? '✕ Close' : '☰ Topics' }}</button>
+
+    <!-- ===== Main ===== -->
+    <main class="ck-main">
+
+      <!-- Search results -->
+      <section v-if="query" class="ck-page">
+        <h1 class="ck-h1">Search: “{{ query }}”</h1>
+        <p class="ck-muted">{{ searchResults.length }} result{{ searchResults.length === 1 ? '' : 's' }} across commands, YAML and labs.</p>
+        <div v-for="r in searchResults.slice(0, 80)" :key="r.key" class="ck-result">
+          <div class="ck-result-head"><span class="pill" :class="'k-' + r.kind">{{ r.kind }}</span><a :href="'#/topic/' + r.topic.id + '/' + r.tab" @click="query=''">{{ r.topic.icon }} {{ r.topic.title }}</a><b>{{ r.title }}</b></div>
+          <div v-if="r.code" class="ck-code small"><pre>{{ r.code }}</pre><button class="ck-copy" @click="copy(r.code)">Copy</button></div>
+          <p v-if="r.note" class="ck-note" v-html="fmt(r.note)"></p>
+        </div>
+      </section>
+
+      <!-- Dashboard -->
+      <section v-else-if="route.view==='home'" class="ck-page">
+        <header class="ck-hero">
+          <div>
+            <div class="ck-kicker">CERTIFIED KUBERNETES ADMINISTRATOR · KUBERNETES {{ k8sVersion }}</div>
+            <h1>Learn it topic by topic. <span class="grad">Then type it from memory.</span></h1>
+            <p>{{ topics.length }} topics in KodeKloud's course order, mapped to the official LF domains. Every topic has concepts, commands to copy, YAML templates, exam traps and hands-on labs. Progress is saved in this browser.</p>
+            <div class="ck-hero-actions">
+              <a class="ck-btn primary" :href="'#/topic/' + (lastTopic || topics[0].id)">{{ lastTopic ? 'Continue: ' + topicById(lastTopic).title : 'Start with topic 01' }} →</a>
+              <a class="ck-btn" href="#/drill">🃏 Drill commands</a>
+              <a class="ck-btn" href="#/mock">⏱️ Mock exam</a>
+            </div>
           </div>
-          <p class="cka-subtitle" style="margin:14px 0 0">The tasks here are original study prompts based on published curriculum and common public lab patterns; they are not recalled or leaked exam questions. Use the linked repositories for their full question sets and license terms.</p>
-        </article>
-      </aside>
-    </section>
-
-    <section v-if="view === 'commands'" class="cka-card">
-      <h2>Kubectl shorthand & command drills</h2><p class="cka-subtitle">Practice typing the command from the task, not only reading a cheat sheet. In an exam shell, confirm which aliases and completions are already configured.</p>
-      <div class="callout" style="margin-bottom:16px"><strong>Setup reminder:</strong> Alias <code>k</code> and completion are commonly available in the exam environment. Learn the patterns; verify your shell instead of assuming setup.</div>
-      <div class="topic-filters"><button class="filter-btn" :class="{active: commandFilter === 'All'}" @click="commandFilter='All'">All</button><button v-for="group in commandGroups" :key="group" class="filter-btn" :class="{active: commandFilter === group}" @click="commandFilter=group">{{ group }}</button></div>
-      <div style="overflow-x:auto"><table class="command-table"><thead><tr><th>Use</th><th>Pattern</th><th>Why it saves time</th></tr></thead><tbody>
-        <tr v-for="(item, i) in filteredCommands" :key="i"><td>{{ item.use }}</td><td class="cmd-cell"><code>{{ item.command }}</code> <button class="command-copy" @click="copy(item.command)">Copy</button></td><td>{{ item.note }}</td></tr>
-      </tbody></table></div>
-      <div class="cka-grid" style="margin-top:22px">
-        <div><h3>Fast manifest workflow</h3><div class="code-wrap"><pre>k run web --image=nginx --dry-run=client -o yaml > pod.yaml
-vi pod.yaml
-k apply -f pod.yaml
-k get pod web -o yaml</pre><button class="copy-btn" @click="copy('k run web --image=nginx --dry-run=client -o yaml > pod.yaml\nvi pod.yaml\nk apply -f pod.yaml\nk get pod web -o yaml')">Copy</button></div><p class="cka-subtitle">Generate a valid starting point. Add fields that kubectl doesn't expose as flags (probes, securityContext, volumes, affinity) in YAML.</p></div>
-        <div><h3>Remember the short flags</h3><div class="callout" style="margin-top:10px"><code>-n</code> namespace · <code>-A</code> all namespaces · <code>-o wide</code> node/IP view · <code>-o yaml</code> manifest · <code>-f</code> file · <code>-l</code> label selector · <code>--tail</code> log lines · <code>-w</code> watch</div><div class="tip" style="margin-top:12px"><b>Verify:</b> After every change, query the object or test connectivity. A green command exit code does not prove the requested outcome.</div></div>
-      </div>
-    </section>
-
-    <section v-if="view === 'nodes'" class="cka-grid">
-      <div>
-        <article class="cka-card">
-          <h2>kubeadm node paths</h2><p class="cka-subtitle">These are kubeadm defaults. Run host-level commands on the task's designated node over SSH; paths can vary with cluster configuration.</p>
-          <div class="path-table-wrap"><table class="command-table path-table"><thead><tr><th>Component / data</th><th>Default path</th><th>Where / notes</th></tr></thead><tbody>
-            <tr><td>API server manifest</td><td><code>/etc/kubernetes/manifests/kube-apiserver.yaml</code></td><td>Control-plane node; static Pod manifest</td></tr>
-            <tr><td>Controller manager manifest</td><td><code>/etc/kubernetes/manifests/kube-controller-manager.yaml</code></td><td>Control-plane node; static Pod manifest. Its arguments and mounted config are declared here.</td></tr>
-            <tr><td>Controller manager kubeconfig</td><td><code>/etc/kubernetes/controller-manager.conf</code></td><td>Control-plane node; identity and API connection used by the component</td></tr>
-            <tr><td>Scheduler manifest</td><td><code>/etc/kubernetes/manifests/kube-scheduler.yaml</code></td><td>Control-plane node; static Pod manifest</td></tr>
-            <tr><td>Scheduler kubeconfig</td><td><code>/etc/kubernetes/scheduler.conf</code></td><td>Control-plane node; identity and API connection used by the component</td></tr>
-            <tr><td>Local etcd manifest</td><td><code>/etc/kubernetes/manifests/etcd.yaml</code></td><td>Control-plane node only with stacked/local etcd</td></tr>
-            <tr><td>Static Pod directory</td><td><code>/etc/kubernetes/manifests/</code></td><td>Usual kubeadm <code>staticPodPath</code>. Create Pod YAML on the node where that kubelet runs.</td></tr>
-            <tr><td>Kubelet config</td><td><code>/var/lib/kubelet/config.yaml</code></td><td>Usual kubeadm ComponentConfig path on every node; service may pass another <code>--config</code></td></tr>
-            <tr><td>Kubelet kubeadm args</td><td><code>/var/lib/kubelet/kubeadm-flags.env</code></td><td>Runtime endpoint and node flags; every node</td></tr>
-            <tr><td>Kubelet service/drop-ins</td><td><code>systemctl cat kubelet</code></td><td>Shows effective unit and drop-in paths; inspect before editing because OS/package layouts vary</td></tr>
-            <tr><td>Kubelet extra args</td><td><code>/etc/default/kubelet</code> or <code>/etc/sysconfig/kubelet</code></td><td>Optional overrides on Debian-family or RPM-family systems; may not exist</td></tr>
-            <tr><td>Kubelet certificates</td><td><code>/var/lib/kubelet/pki/</code></td><td>Typical node-local kubelet certificates; names and setup can vary</td></tr>
-            <tr><td>Other kubeconfigs</td><td><code>/etc/kubernetes/admin.conf</code>, <code>/etc/kubernetes/kubelet.conf</code></td><td>Admin access on control plane; kubelet identity config on every node</td></tr>
-            <tr><td>Certificates and keys</td><td><code>/etc/kubernetes/pki/</code>, <code>/etc/kubernetes/pki/etcd/</code></td><td>Control plane; protect private keys</td></tr>
-            <tr><td>Stacked etcd data</td><td><code>/var/lib/etcd/</code></td><td>Default local etcd dataDir; inspect manifest first</td></tr>
-            <tr><td>kubeadm cluster config</td><td><code>kube-system/kubeadm-config</code> ConfigMap</td><td>Read with kubectl; not a node file</td></tr>
-            <tr><td>kube-proxy / CoreDNS</td><td><code>kube-system</code> ConfigMaps and workloads</td><td>Usually DaemonSet / Deployment config, not control-plane static Pods</td></tr>
-          </tbody></table></div>
-          <div class="tip" style="margin-top:14px"><strong>Static Pod edit:</strong> back up manifests outside <code>/etc/kubernetes/manifests</code>. Kubelet reads every non-hidden file in the watched directory, regardless of extension; a <code>.bak</code> copy there can create another Pod or interfere with the intended one.</div>
-        </article>
-        <article class="cka-card">
-          <h2>Create a static Pod manifest</h2>
-          <p class="cka-subtitle">SSH to the node where the Pod should run, then save a normal Pod YAML file inside that node's kubelet <code>staticPodPath</code>. With the usual kubeadm setup, that directory is <code>/etc/kubernetes/manifests/</code>.</p>
-          <div class="code-wrap"><pre>ssh &lt;node-named-by-task&gt;
-sudo install -d -m 755 /etc/kubernetes/manifests
-sudoedit /etc/kubernetes/manifests/static-web.yaml</pre></div>
-          <p class="cka-subtitle">Put this Pod definition in the editor, save the file, and exit:</p>
-          <div class="code-wrap"><pre>apiVersion: v1
-kind: Pod
-metadata:
-  name: static-web
-  labels:
-    app: static-web
-spec:
-  containers:
-  - name: web
-    image: nginx:1.27
-    ports:
-    - containerPort: 80</pre></div>
-          <div class="code-wrap"><pre># Kubelet notices the file and starts the Pod on this node
-sudo crictl pods
-k get pods -A -o wide | grep static-web
-
-# Verify the selected directory and kubelet health
-sudo grep -n 'staticPodPath' /var/lib/kubelet/config.yaml
-sudo systemctl status kubelet --no-pager
-sudo journalctl -u kubelet -n 50 --no-pager</pre></div>
-          <div class="tip"><strong>What to expect:</strong> kubelet runs the static Pod directly and the API server shows a mirror Pod, commonly named <code>static-web-&lt;node&gt;</code>. Manage it by editing or removing the local manifest, not with <code>kubectl apply</code> or <code>kubectl delete</code>. If the task uses a different <code>staticPodPath</code> or the deprecated <code>--pod-manifest-path</code> flag, use the configured location.</div>
-        </article>
-        <article class="cka-card">
-          <h2>Inspect processes on the task node</h2><p class="cka-subtitle">Follow the task's host instruction (for example, <code>ssh controlplane</code>) and elevate if needed. Repeat on each node named by the task.</p>
-          <div class="code-wrap"><pre>ssh &lt;designated-node&gt;
-sudo -i
-
-# kubelet is a systemd service on every node
-systemctl status kubelet --no-pager
-systemctl cat kubelet
-journalctl -u kubelet -n 100 --no-pager
-
-# CRI containers, including control-plane static Pods
-crictl ps -a
-crictl pods
-crictl ps -a --name kube-apiserver
-crictl logs &lt;container-id&gt;
-
-# Host process view; control-plane components run as containers
-ps -ef | grep -E '[k]ubelet|[k]ube-apiserver|[k]ube-scheduler|[k]ube-controller-manager|[e]tcd'
-
-# API view when the API server is healthy
-k get pods -n kube-system -o wide
-k describe pod kube-apiserver-&lt;node&gt; -n kube-system
-
-# Check the service's config path and kubelet's static manifest directory
-systemctl show kubelet -p FragmentPath -p DropInPaths
-systemctl cat kubelet
-grep -n 'staticPodPath' /var/lib/kubelet/config.yaml
-
-# Inspect the controller-manager static Pod and its container logs
-grep -nE 'image:|command:|kubeconfig|config' /etc/kubernetes/manifests/kube-controller-manager.yaml
-crictl ps -a --name kube-controller-manager
-crictl logs &lt;container-id&gt;</pre></div>
-          <p class="cka-subtitle" style="margin:10px 0 0">If the service uses a config file other than <code>/var/lib/kubelet/config.yaml</code>, inspect the file named by its <code>--config</code> argument. If <code>crictl</code> cannot find the runtime socket, inspect <code>systemctl cat kubelet</code> and <code>/var/lib/kubelet/kubeadm-flags.env</code> for its configured CRI endpoint. Workers normally run kubelet and workload containers; control-plane components are usually absent.</p>
-        </article>
-      </div>
-      <aside>
-        <article class="cka-card">
-          <h2>Back up stacked etcd</h2><p class="cka-subtitle">Run on the control-plane host that runs local etcd. Confirm endpoint and certificate paths in <code>etcd.yaml</code>; external etcd uses its own endpoint and credentials.</p>
-          <div class="code-wrap"><pre># Keep the snapshot outside etcd's live data directory
-sudo install -d -m 700 /opt/etcd-backup
-
-sudo ETCDCTL_API=3 etcdctl \
-  --endpoints=https://127.0.0.1:2379 \
-  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
-  --cert=/etc/kubernetes/pki/etcd/server.crt \
-  --key=/etc/kubernetes/pki/etcd/server.key \
-  snapshot save /opt/etcd-backup/snapshot.db
-
-# Preferred verification (etcdutl version should match etcd)
-sudo etcdutl --write-out=table snapshot status /opt/etcd-backup/snapshot.db
-# If etcdutl is unavailable in the lab, this older etcdctl form may exist:
-sudo ETCDCTL_API=3 etcdctl --write-out=table snapshot status /opt/etcd-backup/snapshot.db
-sudo ls -lh /opt/etcd-backup/snapshot.db</pre></div>
-          <ul class="habit-list"><li><span>1</span><span>Check the etcd container flags if endpoint or certificate names differ.</span></li><li><span>2</span><span>Use an <b>etcdutl</b> version compatible with the etcd major/minor for status and restore.</span></li><li><span>3</span><span>Snapshots contain cluster secrets and state; protect them and keep them off the live data path.</span></li></ul>
-          <div class="tip" style="margin-top:14px"><strong>Restore is separate and disruptive.</strong> Do not restore during a backup task; restore changes the data directory and static Pod configuration.</div>
-        </article>
-        <article class="cka-card">
-          <h2>What the exam confirms</h2>
-          <p class="cka-subtitle">The published CKA competencies explicitly include creating and managing clusters with kubeadm. Linux Foundation instructions say tasks identify a designated SSH host. Public guidance does not promise every prebuilt exam cluster is exclusively kubeadm-created, so treat these as kubeadm defaults and inspect the actual host configuration.</p>
-          <div class="resource-list">
-            <a href="https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/" target="_blank" rel="noopener">Linux Foundation · CKA competencies <span>↗</span></a>
-            <a href="https://docs.linuxfoundation.org/tc-docs/certification/tips-cka-and-ckad" target="_blank" rel="noopener">Linux Foundation · exam host instructions <span>↗</span></a>
-            <a href="https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/" target="_blank" rel="noopener">Kubernetes · kubeadm file paths <span>↗</span></a>
-            <a href="https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/" target="_blank" rel="noopener">Kubernetes · static Pod behavior <span>↗</span></a>
-            <a href="https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/kubelet-integration/" target="_blank" rel="noopener">Kubernetes · kubeadm and kubelet files <span>↗</span></a>
-            <a href="https://kubernetes.io/docs/reference/node/kubelet-files/" target="_blank" rel="noopener">Kubernetes · kubelet local files and paths <span>↗</span></a>
-            <a href="https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/" target="_blank" rel="noopener">Kubernetes · etcd snapshot and restore <span>↗</span></a>
+          <div class="ck-ready">
+            <div class="ck-ready-ring" :style="{ '--p': readiness }"><b>{{ readiness }}<small>%</small></b><span>weighted readiness</span></div>
+            <ul>
+              <li><b>{{ masteredCount }}</b> / {{ allTasks.length }} labs mastered</li>
+              <li><b>{{ drillKnown }}</b> / {{ allCommands.length }} commands known</li>
+              <li><b>{{ mockHistory.length }}</b> mock exam{{ mockHistory.length === 1 ? '' : 's' }}<span v-if="mockHistory.length"> · best {{ bestMock }}%</span></li>
+            </ul>
           </div>
-        </article>
-      </aside>
-    </section>
+        </header>
 
-    <section v-if="view === 'practice'">
-      <div class="callout" style="margin-bottom:16px"><strong>Hands-on loop:</strong> Open a disposable lab, read one task, set any required context, solve it before opening the solution, then verify the final state. KodeKloud labs and Killercoda playgrounds are linked on Overview.</div>
-      <div class="topic-filters"><button class="filter-btn" :class="{active: taskFilter === 'All'}" @click="taskFilter='All'">All domains</button><button v-for="domain in domains" :key="domain.name" class="filter-btn" :class="{active: taskFilter === domain.name}" @click="taskFilter=domain.name">{{ domain.short }} · {{ domain.weight }}%</button></div>
-      <div class="task-list">
-        <article v-for="task in filteredTasks" :key="task.id" class="task-card">
-          <div class="task-main">
-            <div class="task-header"><div><div class="task-tags"><span class="pill">{{ task.domain }}</span><span class="pill weight">{{ task.difficulty }}</span></div><h3>{{ task.title }}</h3></div></div>
-            <p class="task-prompt">{{ task.prompt }}</p>
-            <div class="task-controls"><button class="small-btn" @click="revealed[task.id] = !revealed[task.id]">{{ revealed[task.id] ? 'Hide solution' : 'Show solution' }}</button><button class="small-btn" :class="{done: isDone(task.id)}" @click="toggleDone(task.id)">{{ isDone(task.id) ? '✓ Mastered' : 'Mark mastered' }}</button><span class="muted" style="font-size:.75rem;align-self:center">{{ task.time }}</span></div>
+        <div class="ck-grid-2">
+          <article class="ck-card">
+            <h2>Exam domains</h2>
+            <p class="ck-muted">Official weights from the Linux Foundation curriculum. The bars show labs mastered per domain.</p>
+            <div v-for="d in domains" :key="d.name" class="ck-domain">
+              <div class="ck-domain-top"><span>{{ d.name }}</span><b>{{ d.weight }}%</b></div>
+              <div class="ck-bar"><i :style="{ width: domainProgress(d.name) + '%' }"></i></div>
+              <div class="ck-domain-foot">{{ domainDone(d.name) }}/{{ domainTasks(d.name).length }} labs · {{ domainProgress(d.name) }}%</div>
+              <details><summary>Competencies</summary><ul><li v-for="c in d.competencies" :key="c">{{ c }}</li></ul></details>
+            </div>
+          </article>
+          <article class="ck-card">
+            <h2>Exam-day routine</h2>
+            <ol class="ck-steps">
+              <li>Read the task's weight and <b>run the ssh/context line it gives</b> before anything else.</li>
+              <li>Set the namespace: <code>k config set-context --current --namespace=&lt;ns&gt;</code>.</li>
+              <li>Generate YAML with <code>--dry-run=client -o yaml</code>; look up fields with <code>k explain</code>.</li>
+              <li>Debug in order: <b>get → describe → logs → events</b>.</li>
+              <li>Verify the result the task asks for, then <code>exit</code> back to the base host.</li>
+              <li>Skip anything over ~8 min, note it on the notepad, and come back to it.</li>
+            </ol>
+            <h3>Practice environments</h3>
+            <div class="ck-links">
+              <a href="https://kodekloud.com/courses/cka-certification-course-certified-kubernetes-administrator/" target="_blank" rel="noopener">KodeKloud CKA course + labs ↗</a>
+              <a href="https://killercoda.com/playgrounds" target="_blank" rel="noopener">Killercoda free playgrounds ↗</a>
+              <a href="https://killer.sh" target="_blank" rel="noopener">killer.sh simulator (2 sessions with exam) ↗</a>
+              <a href="https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/" target="_blank" rel="noopener">LF CKA page & curriculum ↗</a>
+              <a href="https://docs.linuxfoundation.org/tc-docs/certification/tips-cka-and-ckad" target="_blank" rel="noopener">LF exam tips & allowed resources ↗</a>
+              <a href="https://github.com/techiescamp/cka-certification-guide" target="_blank" rel="noopener">TechiesCamp CKA guide ↗</a>
+              <a href="https://github.com/chadmcrowell/CKA-Exercises" target="_blank" rel="noopener">chadmcrowell CKA exercises ↗</a>
+            </div>
+          </article>
+        </div>
+
+        <h2 class="ck-h2">Study path</h2>
+        <div class="ck-topic-grid">
+          <a v-for="(t, i) in topics" :key="t.id" class="ck-topic-card" :href="'#/topic/' + t.id">
+            <div class="ck-tc-top"><span class="ck-tc-icon">{{ t.icon }}</span><span class="ck-tc-num">{{ String(i + 1).padStart(2, '0') }}</span></div>
+            <h3>{{ t.title }}</h3>
+            <p class="ck-tc-kk">{{ t.kodekloud }}</p>
+            <p class="ck-tc-meta">{{ t.concepts.length }} concepts · {{ t.commands.length }} commands · {{ t.tasks.length }} labs</p>
+            <div class="ck-bar thin"><i :style="{ width: topicProgress(t) + '%' }"></i></div>
+          </a>
+        </div>
+        <p class="ck-foot">Content reviewed {{ reviewed }} against the LF CKA curriculum (Kubernetes {{ k8sVersion }}) and the KodeKloud CKA course outline. The labs are original practice tasks, not exam dumps. Run them in a disposable cluster.</p>
+      </section>
+
+      <!-- Topic -->
+      <section v-else-if="route.view==='topic' && topic" class="ck-page">
+        <header class="ck-topic-head">
+          <div class="ck-th-icon">{{ topic.icon }}</div>
+          <div>
+            <div class="ck-kicker">TOPIC {{ String(topicIndex + 1).padStart(2, '0') }} · {{ topic.kodekloud }}</div>
+            <h1 class="ck-h1">{{ topic.title }}</h1>
+            <p class="ck-lead" v-html="fmt(topic.summary)"></p>
+            <div class="ck-chips"><span class="chip" v-for="o in topic.objectives" :key="o">{{ o }}</span></div>
           </div>
-          <div v-if="revealed[task.id]" class="answer-panel"><p><strong>One possible approach</strong> — resource names and versions may vary by lab. Verify against the task requirements.</p><div v-for="(step, index) in task.steps" :key="index"><p v-if="step.note">{{ step.note }}</p><div v-if="step.code" class="code-wrap"><pre>{{ step.code }}</pre><button class="copy-btn" @click="copy(step.code)">Copy</button></div></div><div class="tip"><strong>Check:</strong> {{ task.check }}</div></div>
-        </article>
-      </div>
-    </section>
-    <footer class="platform-footer">Study content reviewed {{ reviewedDate }} · Exam objectives can change; check the Linux Foundation page before your exam.</footer>
-  </main>
+        </header>
+
+        <div class="ck-tabs" role="tablist">
+          <a v-for="tb in topicTabs" :key="tb.id" role="tab" :aria-selected="route.tab===tb.id" :class="{ active: route.tab===tb.id }" :href="'#/topic/' + topic.id + '/' + tb.id">{{ tb.label }}<span v-if="tb.count !== undefined" class="cnt">{{ tb.count }}</span></a>
+        </div>
+
+        <!-- Learn -->
+        <div v-if="route.tab==='learn'">
+          <div class="ck-concepts">
+            <article v-for="c in topic.concepts" :key="c.title" class="ck-concept"><h3>{{ c.title }}</h3><p v-html="fmt(c.body)"></p></article>
+          </div>
+          <article v-for="tb in (topic.tables || [])" :key="tb.title" class="ck-card">
+            <h2>{{ tb.title }}</h2><p class="ck-muted">{{ tb.note }}</p>
+            <div class="ck-table-wrap"><table class="ck-table"><thead><tr><th v-for="c in tb.cols" :key="c">{{ c }}</th></tr></thead>
+              <tbody><tr v-for="(row, ri) in tb.rows" :key="ri"><td v-for="(cell, ci) in row" :key="ci"><code v-if="ci===1">{{ cell }}</code><template v-else>{{ cell }}</template></td></tr></tbody></table></div>
+          </article>
+          <article class="ck-card ck-traps">
+            <h2>⚠️ Exam traps</h2>
+            <ul><li v-for="g in topic.gotchas" :key="g" v-html="fmt(g)"></li></ul>
+          </article>
+        </div>
+
+        <!-- Commands -->
+        <div v-if="route.tab==='commands'">
+          <div class="ck-toolbar">
+            <input v-model="cmdFilter" type="search" placeholder="Filter this topic's commands…" />
+            <label class="ck-switch"><input type="checkbox" v-model="quiz" /> <span>Quiz mode: hide commands</span></label>
+            <span class="ck-muted small">{{ topicKnown(topic) }}/{{ topic.commands.length }} marked known</span>
+          </div>
+          <template v-for="g in commandGroups" :key="g.name">
+            <h3 class="ck-group">{{ g.name }}</h3>
+            <div class="ck-cmds">
+              <div v-for="c in g.items" :key="c.use" class="ck-cmd" :class="{ known: isKnown(topic, c) }">
+                <div class="ck-cmd-head"><b>{{ c.use }}</b>
+                  <button class="ck-mini" :class="{ on: isKnown(topic, c) }" @click="toggleKnown(topic, c)" :title="isKnown(topic, c) ? 'Marked as known' : 'Mark as known'">{{ isKnown(topic, c) ? '✓ known' : 'mark known' }}</button></div>
+                <div class="ck-code" :class="{ hidden: quiz && !peek[cmdKey(topic, c)] }" @click="quiz && (peek[cmdKey(topic, c)] = true)">
+                  <pre>{{ c.cmd }}</pre>
+                  <button class="ck-copy" @click.stop="copy(c.cmd)">Copy</button>
+                  <span v-if="quiz && !peek[cmdKey(topic, c)]" class="ck-reveal">Type it in your terminal, then click to reveal</span>
+                </div>
+                <p v-if="c.note" class="ck-note" v-html="fmt(c.note)"></p>
+              </div>
+            </div>
+          </template>
+          <p v-if="!commandGroups.length" class="ck-muted">No commands match “{{ cmdFilter }}”.</p>
+        </div>
+
+        <!-- YAML -->
+        <div v-if="route.tab==='yaml'" class="ck-yamls">
+          <article v-for="y in topic.yaml" :key="y.title" class="ck-card">
+            <h3>{{ y.title }}</h3><p v-if="y.note" class="ck-muted" v-html="fmt(y.note)"></p>
+            <div class="ck-code"><pre>{{ y.code }}</pre><button class="ck-copy" @click="copy(y.code)">Copy</button></div>
+          </article>
+        </div>
+
+        <!-- Labs -->
+        <div v-if="route.tab==='labs'">
+          <div class="ck-callout"><b>How to use the labs:</b> open a disposable cluster (KodeKloud lab, Killercoda, kind or kubeadm VMs), solve the task <b>before</b> opening the solution, then run the check. Mark a lab mastered only once you can solve it without help. <code>$do</code> means <code>--dry-run=client -o yaml</code>.</div>
+          <article v-for="task in topic.tasks" :key="task.id" class="ck-task" :class="{ done: mastered[task.id] }">
+            <div class="ck-task-tags"><span class="pill">{{ task.domain || topic.domain }}</span><span class="pill soft">{{ task.difficulty }}</span><span class="pill soft">⏱ {{ task.time }}</span></div>
+            <h3>{{ task.title }}</h3>
+            <p class="ck-prompt">{{ task.prompt }}</p>
+            <div class="ck-task-actions">
+              <button class="ck-btn small" @click="revealed[task.id] = !revealed[task.id]">{{ revealed[task.id] ? 'Hide solution' : 'Show solution' }}</button>
+              <button class="ck-btn small" :class="{ success: mastered[task.id] }" @click="toggleMastered(task.id)">{{ mastered[task.id] ? '✓ Mastered' : 'Mark mastered' }}</button>
+            </div>
+            <div v-if="revealed[task.id]" class="ck-solution">
+              <template v-for="(s, si) in task.steps" :key="si">
+                <p v-if="s.note" v-html="fmt(s.note)"></p>
+                <div v-if="s.code" class="ck-code"><pre>{{ s.code }}</pre><button class="ck-copy" @click="copy(s.code)">Copy</button></div>
+              </template>
+              <div class="ck-check"><b>✔ Verify:</b> <span v-html="fmt(task.check)"></span></div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Docs -->
+        <div v-if="route.tab==='docs'" class="ck-card">
+          <h2>Official docs for this topic</h2>
+          <p class="ck-muted">kubernetes.io docs are allowed during the exam. Learn where these pages are so you can find the YAML examples fast.</p>
+          <div class="ck-links"><a v-for="d in topic.docs" :key="d.url" :href="d.url" target="_blank" rel="noopener">{{ d.label }} ↗</a></div>
+        </div>
+
+        <nav class="ck-pager">
+          <a v-if="topicIndex > 0" :href="'#/topic/' + topics[topicIndex - 1].id">← {{ topics[topicIndex - 1].title }}</a><span v-else></span>
+          <a v-if="topicIndex < topics.length - 1" :href="'#/topic/' + topics[topicIndex + 1].id">{{ topics[topicIndex + 1].title }} →</a>
+        </nav>
+      </section>
+
+      <!-- Drill -->
+      <section v-else-if="route.view==='drill'" class="ck-page">
+        <h1 class="ck-h1">🃏 Command drill</h1>
+        <p class="ck-lead">You get a task description. Type the command (here, or better, in a real terminal), then reveal it and grade yourself. Commands you miss come back more often.</p>
+        <div class="ck-chips selectable">
+          <button class="chip" :class="{ on: !drillTopics.length }" @click="drillTopics = []; nextCard()">All topics</button>
+          <button v-for="t in topics" :key="t.id" class="chip" :class="{ on: drillTopics.includes(t.id) }" @click="toggleDrillTopic(t.id)">{{ t.icon }} {{ t.title }}</button>
+        </div>
+        <div v-if="card" class="ck-flash">
+          <div class="ck-flash-meta">{{ card.topic.icon }} {{ card.topic.title }} · {{ card.c.group }}</div>
+          <h2>{{ card.c.use }}</h2>
+          <p v-if="card.c.note" class="ck-muted" v-html="fmt(card.c.note)"></p>
+          <textarea v-model="drillAnswer" class="ck-answer" rows="3" placeholder="Type the command…" spellcheck="false" @keydown.ctrl.enter="drillReveal = true"></textarea>
+          <div v-if="drillReveal" class="ck-code"><pre>{{ card.c.cmd }}</pre><button class="ck-copy" @click="copy(card.c.cmd)">Copy</button></div>
+          <div class="ck-flash-actions">
+            <button v-if="!drillReveal" class="ck-btn primary" @click="drillReveal = true">Reveal (Ctrl+Enter)</button>
+            <template v-else>
+              <button class="ck-btn success" @click="grade(true)">✓ Knew it</button>
+              <button class="ck-btn danger" @click="grade(false)">✗ Missed it</button>
+            </template>
+            <button class="ck-btn ghost" @click="nextCard()">Skip</button>
+          </div>
+        </div>
+        <div class="ck-stats">
+          <div><b>{{ session.ok }}</b><span>knew this session</span></div>
+          <div><b>{{ session.miss }}</b><span>missed this session</span></div>
+          <div><b>{{ drillKnown }}</b><span>known overall</span></div>
+          <div><b>{{ allCommands.length }}</b><span>commands in pool</span></div>
+        </div>
+      </section>
+
+      <!-- Mock exam -->
+      <section v-else-if="route.view==='mock'" class="ck-page">
+        <template v-if="!mock.active && !mock.finished">
+          <h1 class="ck-h1">⏱️ Mock exam</h1>
+          <p class="ck-lead">Labs are drawn at random in proportion to the official domain weights. Solve them in your own cluster against the clock, then mark each one solved or not. You see the solutions after you finish.</p>
+          <div class="ck-card ck-mock-setup">
+            <label>Number of tasks
+              <select v-model.number="mockCfg.count"><option :value="8">8 (quick, ~60 min)</option><option :value="12">12 (~90 min)</option><option :value="16">16 (exam-like, 120 min)</option><option :value="20">20 (hard mode)</option></select>
+            </label>
+            <label>Time limit (minutes)<input type="number" v-model.number="mockCfg.minutes" min="10" max="240" /></label>
+            <label class="ck-switch"><input type="checkbox" v-model="mockCfg.unmasteredFirst" /> <span>Prefer labs I haven't mastered</span></label>
+            <button class="ck-btn primary" @click="startMock">Start mock exam</button>
+          </div>
+          <div v-if="mockHistory.length" class="ck-card">
+            <h2>History</h2>
+            <table class="ck-table"><thead><tr><th>Date</th><th>Tasks</th><th>Score</th><th>Time used</th></tr></thead>
+              <tbody><tr v-for="(h, i) in mockHistory.slice().reverse()" :key="i"><td>{{ new Date(h.date).toLocaleString() }}</td><td>{{ h.solved }}/{{ h.total }}</td><td :class="h.score >= 66 ? 'ok' : 'bad'">{{ h.score }}%</td><td>{{ h.used }} min</td></tr></tbody></table>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="ck-mock-bar">
+            <b>{{ mock.finished ? 'Results' : 'Mock exam in progress' }}</b>
+            <span v-if="!mock.finished" class="ck-timer" :class="{ low: remaining < 600 }">{{ clock(remaining) }}</span>
+            <span>Solved {{ mockSolvedCount }}/{{ mock.tasks.length }} · {{ mockScore }}% weighted</span>
+            <button v-if="!mock.finished" class="ck-btn small primary" @click="finishMock">Finish & review</button>
+            <button v-else class="ck-btn small" @click="resetMock">New mock</button>
+          </div>
+          <div v-if="mock.finished" class="ck-callout" :class="mockScore >= 66 ? 'good' : 'warn'"><b>{{ mockScore }}%</b>. The CKA pass mark is 66%. {{ mockScore >= 66 ? 'Pass-level result. Now review any task you were slow on.' : 'Review the solutions below, then redo the topics they came from.' }}</div>
+          <article v-for="(m, i) in mockTasks" :key="m.task.id" class="ck-task" :class="{ done: mock.solved[m.task.id] }">
+            <div class="ck-task-tags"><span class="pill">Task {{ i + 1 }} · weight {{ mock.weights[m.task.id] }}%</span><span class="pill soft">{{ m.domain }}</span><a class="pill soft" :href="'#/topic/' + m.topic.id + '/labs'">{{ m.topic.title }}</a></div>
+            <h3>{{ m.task.title }}</h3>
+            <p class="ck-prompt">{{ m.task.prompt }}</p>
+            <div class="ck-task-actions">
+              <label class="ck-switch"><input type="checkbox" v-model="mock.solved[m.task.id]" @change="saveMock" /> <span>I solved and verified this</span></label>
+              <button v-if="mock.finished" class="ck-btn small" @click="revealed[m.task.id] = !revealed[m.task.id]">{{ revealed[m.task.id] ? 'Hide solution' : 'Show solution' }}</button>
+            </div>
+            <div v-if="mock.finished && revealed[m.task.id]" class="ck-solution">
+              <template v-for="(s, si) in m.task.steps" :key="si"><p v-if="s.note" v-html="fmt(s.note)"></p><div v-if="s.code" class="ck-code"><pre>{{ s.code }}</pre><button class="ck-copy" @click="copy(s.code)">Copy</button></div></template>
+              <div class="ck-check"><b>✔ Verify:</b> <span v-html="fmt(m.task.check)"></span></div>
+            </div>
+          </article>
+        </template>
+      </section>
+    </main>
+
+    <div class="ck-toast" :class="{ show: toast }">{{ toast }}</div>
+  </div>
+
   <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
-  <script src="../js/cka.js"></script>
+  <script src="../js/cka/registry.js"></script>
+  <script src="../js/cka/topics/01-exam-setup.js"></script>
+  <script src="../js/cka/topics/02-core-concepts.js"></script>
+  <script src="../js/cka/topics/03-scheduling.js"></script>
+  <script src="../js/cka/topics/04-logging-monitoring.js"></script>
+  <script src="../js/cka/topics/05-app-lifecycle.js"></script>
+  <script src="../js/cka/topics/06-cluster-maintenance.js"></script>
+  <script src="../js/cka/topics/07-security.js"></script>
+  <script src="../js/cka/topics/08-storage.js"></script>
+  <script src="../js/cka/topics/09-networking.js"></script>
+  <script src="../js/cka/topics/10-install-kubeadm.js"></script>
+  <script src="../js/cka/topics/11-helm.js"></script>
+  <script src="../js/cka/topics/12-kustomize.js"></script>
+  <script src="../js/cka/topics/13-crds-operators.js"></script>
+  <script src="../js/cka/topics/14-troubleshooting.js"></script>
+  <script src="../js/cka/app.js"></script>
 </body>
 </html>
