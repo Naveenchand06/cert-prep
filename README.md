@@ -22,7 +22,9 @@ python3 -m http.server 8111
 
 Built with **Vue 3** (CDN global build) and hash routing, so it still deploys as plain static files. Routes:
 
-- `#/`: dashboard with official domain weights, weighted readiness and the study path
+- `#/`: dashboard. One "continue" button, the learn → drill → test loop, the study path grouped into 5 phases, and domain weights
+- `#/exam`: exam guide. Format and rules, the per-task routine, and the question types for each domain with a short recipe and links to the labs that practise them
+- `#/ref`: cheat sheet of shorthand commands (run, expose, drain, RBAC, etcd backup/restore, upgrade, Helm). `#/ref/paths`: config file paths (static Pods, kubelet, kubeconfigs, PKI, etcd, runtime/CNI, logs) with the command to confirm each on the host. Click to copy
 - `#/topic/<id>/<tab>`: one topic, with tabs **Learn** (concepts, reference tables, exam traps), **Commands** (grouped, copy buttons, quiz mode that hides commands, "known" tracking), **YAML** templates, **Labs** (task → hidden solution → verify step, mark mastered) and **Docs**
 - `#/drill`: flashcards. You get a description, type the command, reveal and grade yourself; missed commands come back more often
 - `#/mock`: random labs weighted by exam domain, with a timer (default 16 tasks / 120 min), self-marking, pass/fail against 66% and history
@@ -50,7 +52,7 @@ Press `/` anywhere to search all commands, YAML, labs and concepts.
 
 ### Adding content
 
-Each topic is one file in `js/cka/topics/` that calls `CKA.topic({...})`. The schema is documented at the top of `js/cka/registry.js`. To add a topic, create the file and add a `<script>` tag for it in `pages/cka.html`. Lab `id`s are progress keys, so keep them stable. Text fields support `` `code` `` and `**bold**`.
+Exam facts, question types, phases, paths and the cheat sheet live in `js/cka/reference.js`. Each topic is one file in `js/cka/topics/` that calls `CKA.topic({...})`. The schema is documented at the top of `js/cka/registry.js`. To add a topic, create the file and add a `<script>` tag for it in `pages/cka.html`. Lab `id`s are progress keys, so keep them stable. Text fields support `` `code` `` and `**bold**`.
 
 ### Storage keys
 

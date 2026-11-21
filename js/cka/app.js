@@ -1,5 +1,5 @@
 /* CKA study workspace. Vue 3 (global build), hash routing, localStorage progress.
-   Routes: #/  ·  #/topic/<id>[/<tab>]  ·  #/drill  ·  #/mock */
+   Routes: #/  ·  #/exam  ·  #/ref[/cmds|paths]  ·  #/topic/<id>[/<tab>]  ·  #/drill  ·  #/mock */
 (function () {
   const { createApp } = Vue;
   const MASTERED_KEY = 'cka-mastered-v1'; // kept from v1 so earlier progress carries over
@@ -15,6 +15,8 @@
     const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
     if (parts[0] === 'topic' && parts[1]) return { view: 'topic', id: parts[1], tab: TABS.includes(parts[2]) ? parts[2] : 'learn' };
     if (parts[0] === 'drill') return { view: 'drill' };
+    if (parts[0] === 'exam') return { view: 'exam' };
+    if (parts[0] === 'ref') return { view: 'ref', tab: parts[1] === 'paths' ? 'paths' : 'cmds' };
     if (parts[0] === 'mock') return { view: 'mock' };
     return { view: 'home' };
   }
@@ -27,6 +29,11 @@
         domains: CKA.domains,
         k8sVersion: CKA.k8sVersion,
         reviewed: CKA.reviewed,
+        exam: CKA.exam,
+        questionTypes: CKA.questionTypes,
+        paths: CKA.paths,
+        cheats: CKA.cheats,
+        refFilter: '',
         route: parseRoute(),
         sideOpen: false,
         query: '',
@@ -68,6 +75,23 @@
       masteredCount() { return this.allTasks.filter(x => this.mastered[x.task.id]).length; },
       drillKnown() { return this.allCommands.filter(x => this.known[this.cmdKey(x.topic, x.c)]).length; },
       readiness() { return Math.round(this.domains.reduce((s, d) => s + d.weight * this.domainProgress(d.name) / 100, 0)); },
+      phases() {
+        return CKA.phases.map(p => ({ ...p, items: p.topics.map(id => this.topicById(id)).filter(Boolean) }));
+      },
+      nextTopic() {
+        if (this.lastTopic && this.topicById(this.lastTopic) && this.topicProgress(this.topicById(this.lastTopic)) < 100) return this.topicById(this.lastTopic);
+        return this.topics.find(t => this.topicProgress(t) < 100) || this.topics[0];
+      },
+      drillLeft() { return this.allCommands.length - this.drillKnown; },
+      lastMock() { return this.mockHistory.length ? this.mockHistory[this.mockHistory.length - 1] : null; },
+      cheatGroups() {
+        const f = this.refFilter.trim().toLowerCase();
+        return this.cheats.map(g => ({ ...g, items: g.items.filter(([use, cmd]) => !f || (g.group + ' ' + use + ' ' + cmd).toLowerCase().includes(f)) })).filter(g => g.items.length);
+      },
+      pathGroups() {
+        const f = this.refFilter.trim().toLowerCase();
+        return this.paths.map(g => ({ ...g, rows: g.rows.filter(r => !f || (g.group + ' ' + r.join(' ')).toLowerCase().includes(f)) })).filter(g => g.rows.length);
+      },
       bestMock() { return Math.max(0, ...this.mockHistory.map(h => h.score)); },
       commandGroups() {
         const f = this.cmdFilter.trim().toLowerCase();
@@ -102,10 +126,13 @@
       mockScore() { return this.mock.tasks.reduce((s, id) => s + (this.mock.solved[id] ? this.mock.weights[id] || 0 : 0), 0); },
     },
     watch: {
-      route: { handler(r) { if (r.view === 'topic' && this.topicById(r.id)) { this.lastTopic = r.id; this.saveState(); } this.cmdFilter = ''; this.peek = {}; window.scrollTo(0, 0); }, deep: true },
+      route: { handler(r) { if (r.view === 'topic' && this.topicById(r.id)) { this.lastTopic = r.id; this.saveState(); } this.cmdFilter = ''; this.refFilter = ''; this.peek = {}; window.scrollTo(0, 0); }, deep: true },
     },
     methods: {
       topicById(id) { return this.topics.find(t => t.id === id); },
+      topicNum(t) { return String(this.topics.indexOf(t) + 1).padStart(2, '0'); },
+      labInfo(id) { return this.allTasks.find(x => x.task.id === id); },
+      domainWeight(name) { const d = this.domains.find(x => x.name === name); return d ? d.weight : 0; },
       fmt(s) {
         return esc(s || '')
           .replace(/`([^`]+)`/g, '<code>$1</code>')

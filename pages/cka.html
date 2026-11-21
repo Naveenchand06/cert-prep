@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="CKA study workspace: topic-wise kubectl commands, YAML templates, hands-on labs, command flashcards and a timed mock exam." />
+  <meta name="description" content="CKA study workspace: exam guide, shorthand cheat sheet, config file paths, topic-wise commands, YAML, labs, command flashcards and a timed mock exam." />
   <title>CKA Study Workspace — Cloud Certs Lab</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -22,24 +22,32 @@
     <!-- ===== Sidebar ===== -->
     <aside class="ck-side" :class="{ open: sideOpen }">
       <div class="ck-search">
-        <input v-model="query" type="search" placeholder="Search commands, YAML, labs…  ( / )" ref="search" @keydown.esc="query=''" aria-label="Search CKA content" />
+        <input v-model="query" type="search" placeholder="Search everything  ( / )" ref="search" @keydown.esc="query=''" aria-label="Search CKA content" />
       </div>
-      <nav class="ck-menu" aria-label="CKA sections">
+      <div class="ck-side-label">Start here</div>
+      <nav class="ck-menu" aria-label="Start here">
         <a :class="{ active: route.view==='home' && !query }" href="#/" @click="sideOpen=false"><span class="ic">🏠</span>Dashboard</a>
+        <a :class="{ active: route.view==='exam' && !query }" href="#/exam" @click="sideOpen=false"><span class="ic">🎯</span>Exam guide</a>
+        <a :class="{ active: route.view==='ref' && !query }" href="#/ref" @click="sideOpen=false"><span class="ic">📋</span>Cheat sheet &amp; paths</a>
+      </nav>
+      <div class="ck-side-label">Practice</div>
+      <nav class="ck-menu" aria-label="Practice">
         <a :class="{ active: route.view==='drill' && !query }" href="#/drill" @click="sideOpen=false"><span class="ic">🃏</span>Command drill</a>
         <a :class="{ active: route.view==='mock' && !query }" href="#/mock" @click="sideOpen=false"><span class="ic">⏱️</span>Mock exam <span v-if="mock.active" class="ck-live">LIVE</span></a>
       </nav>
-      <div class="ck-side-label">Study path · {{ topics.length }} topics</div>
-      <nav class="ck-topics" aria-label="Topics">
-        <a v-for="(t, i) in topics" :key="t.id" :href="'#/topic/' + t.id" @click="sideOpen=false"
-           :class="{ active: route.view==='topic' && route.id===t.id && !query }">
-          <span class="num">{{ String(i + 1).padStart(2, '0') }}</span>
-          <span class="tt">{{ t.title }}</span>
-          <span class="ring" :style="{ '--p': topicProgress(t) }" :title="topicProgress(t) + '% labs mastered'"></span>
-        </a>
-      </nav>
+      <template v-for="(p, pi) in phases" :key="p.name">
+        <div class="ck-side-label">{{ pi + 1 }} · {{ p.name }}</div>
+        <nav class="ck-topics" :aria-label="p.name">
+          <a v-for="t in p.items" :key="t.id" :href="'#/topic/' + t.id" @click="sideOpen=false"
+             :class="{ active: route.view==='topic' && route.id===t.id && !query }">
+            <span class="num">{{ topicNum(t) }}</span>
+            <span class="tt">{{ t.title }}</span>
+            <span class="ring" :style="{ '--p': topicProgress(t) }" :title="topicProgress(t) + '% labs mastered'"></span>
+          </a>
+        </nav>
+      </template>
     </aside>
-    <button class="ck-side-toggle" @click="sideOpen=!sideOpen" :aria-expanded="sideOpen">{{ sideOpen ? '✕ Close' : '☰ Topics' }}</button>
+    <button class="ck-side-toggle" @click="sideOpen=!sideOpen" :aria-expanded="sideOpen">{{ sideOpen ? '✕ Close' : '☰ Menu' }}</button>
 
     <!-- ===== Main ===== -->
     <main class="ck-main">
@@ -59,70 +67,138 @@
       <section v-else-if="route.view==='home'" class="ck-page">
         <header class="ck-hero">
           <div>
-            <div class="ck-kicker">CERTIFIED KUBERNETES ADMINISTRATOR · KUBERNETES {{ k8sVersion }}</div>
-            <h1>Learn it topic by topic. <span class="grad">Then type it from memory.</span></h1>
-            <p>{{ topics.length }} topics in KodeKloud's course order, mapped to the official LF domains. Every topic has concepts, commands to copy, YAML templates, exam traps and hands-on labs. Progress is saved in this browser.</p>
+            <div class="ck-kicker">CKA · KUBERNETES {{ k8sVersion }}</div>
+            <h1>One topic at a time. <span class="grad">Then prove it under the clock.</span></h1>
+            <p>Learn a topic, drill its commands until you can type them blind, then test yourself with a timed mock. Progress is saved in this browser.</p>
             <div class="ck-hero-actions">
-              <a class="ck-btn primary" :href="'#/topic/' + (lastTopic || topics[0].id)">{{ lastTopic ? 'Continue: ' + topicById(lastTopic).title : 'Start with topic 01' }} →</a>
-              <a class="ck-btn" href="#/drill">🃏 Drill commands</a>
-              <a class="ck-btn" href="#/mock">⏱️ Mock exam</a>
+              <a class="ck-btn primary big" :href="'#/topic/' + nextTopic.id">{{ lastTopic ? 'Continue' : 'Start' }}: {{ nextTopic.icon }} {{ nextTopic.title }} →</a>
             </div>
           </div>
           <div class="ck-ready">
-            <div class="ck-ready-ring" :style="{ '--p': readiness }"><b>{{ readiness }}<small>%</small></b><span>weighted readiness</span></div>
-            <ul>
-              <li><b>{{ masteredCount }}</b> / {{ allTasks.length }} labs mastered</li>
-              <li><b>{{ drillKnown }}</b> / {{ allCommands.length }} commands known</li>
-              <li><b>{{ mockHistory.length }}</b> mock exam{{ mockHistory.length === 1 ? '' : 's' }}<span v-if="mockHistory.length"> · best {{ bestMock }}%</span></li>
-            </ul>
+            <div class="ck-ready-ring" :style="{ '--p': readiness }"><b>{{ readiness }}<small>%</small></b><span>exam readiness</span></div>
           </div>
         </header>
 
+        <div class="ck-steps3">
+          <a class="ck-step" :href="'#/topic/' + nextTopic.id">
+            <span class="ck-step-n">1</span>
+            <div><b>Learn</b><span>{{ masteredCount }}/{{ allTasks.length }} labs mastered</span></div>
+          </a>
+          <a class="ck-step" href="#/drill">
+            <span class="ck-step-n">2</span>
+            <div><b>Drill</b><span>{{ drillLeft }} commands still to learn</span></div>
+          </a>
+          <a class="ck-step" href="#/mock">
+            <span class="ck-step-n">3</span>
+            <div><b>Test</b><span>{{ lastMock ? 'Last mock ' + lastMock.score + '% · best ' + bestMock + '%' : 'No mock yet. Pass mark 66%' }}</span></div>
+          </a>
+        </div>
+
+        <div class="ck-quick">
+          <a class="ck-quick-card" href="#/exam"><span>🎯</span><div><b>Exam guide</b><small>Format, rules and the question types you will get, with a recipe for each</small></div></a>
+          <a class="ck-quick-card" href="#/ref"><span>📋</span><div><b>Cheat sheet</b><small>Shorthand commands: run, expose, drain, etcd backup, upgrade</small></div></a>
+          <a class="ck-quick-card" href="#/ref/paths"><span>🗂️</span><div><b>Config file paths</b><small>kubelet, static Pods, scheduler, controller-manager, certs</small></div></a>
+        </div>
+
+        <h2 class="ck-h2">Study path</h2>
+        <div class="ck-phases">
+          <div v-for="(p, pi) in phases" :key="p.name" class="ck-phase">
+            <div class="ck-phase-head"><span class="ck-phase-n">{{ pi + 1 }}</span><div><b>{{ p.name }}</b><small>{{ p.hint }}</small></div></div>
+            <div class="ck-phase-topics">
+              <a v-for="t in p.items" :key="t.id" :href="'#/topic/' + t.id" class="ck-pt" :class="{ done: topicProgress(t) === 100, next: t.id === nextTopic.id }">
+                <span class="ic">{{ t.icon }}</span><span class="tt">{{ t.title }}</span>
+                <span class="ring" :style="{ '--p': topicProgress(t) }"></span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <h2 class="ck-h2">Where the marks are</h2>
+        <div class="ck-card">
+          <div v-for="d in domains" :key="d.name" class="ck-wrow">
+            <span class="ck-wname">{{ d.short }}</span>
+            <div class="ck-bar"><i :style="{ width: domainProgress(d.name) + '%' }"></i></div>
+            <span class="ck-wpct"><b>{{ d.weight }}%</b> of exam</span>
+          </div>
+          <p class="ck-muted small" style="margin:10px 0 0">Bars show labs you have mastered in each domain. Troubleshooting alone is almost a third of the score.</p>
+        </div>
+        <p class="ck-foot">Reviewed {{ reviewed }} against the LF CKA curriculum (Kubernetes {{ k8sVersion }}) and the KodeKloud course. Labs are original practice tasks, not exam dumps.</p>
+      </section>
+
+      <!-- Exam guide -->
+      <section v-else-if="route.view==='exam'" class="ck-page">
+        <h1 class="ck-h1">🎯 Exam guide</h1>
+        <p class="ck-lead">What the real CKA looks like, and the kinds of tasks each domain gives you. Each task type has a short recipe and the labs here that practise it.</p>
+
+        <div class="ck-facts">
+          <div v-for="f in exam.facts" :key="f.k"><span>{{ f.k }}</span><b>{{ f.v }}</b></div>
+        </div>
+
         <div class="ck-grid-2">
           <article class="ck-card">
-            <h2>Exam domains</h2>
-            <p class="ck-muted">Official weights from the Linux Foundation curriculum. The bars show labs mastered per domain.</p>
-            <div v-for="d in domains" :key="d.name" class="ck-domain">
-              <div class="ck-domain-top"><span>{{ d.name }}</span><b>{{ d.weight }}%</b></div>
-              <div class="ck-bar"><i :style="{ width: domainProgress(d.name) + '%' }"></i></div>
-              <div class="ck-domain-foot">{{ domainDone(d.name) }}/{{ domainTasks(d.name).length }} labs · {{ domainProgress(d.name) }}%</div>
-              <details><summary>Competencies</summary><ul><li v-for="c in d.competencies" :key="c">{{ c }}</li></ul></details>
-            </div>
+            <h2>The environment</h2>
+            <ul class="ck-list"><li v-for="e in exam.environment" :key="e" v-html="fmt(e)"></li></ul>
           </article>
           <article class="ck-card">
-            <h2>Exam-day routine</h2>
-            <ol class="ck-steps">
-              <li>Read the task's weight and <b>run the ssh/context line it gives</b> before anything else.</li>
-              <li>Set the namespace: <code>k config set-context --current --namespace=&lt;ns&gt;</code>.</li>
-              <li>Generate YAML with <code>--dry-run=client -o yaml</code>; look up fields with <code>k explain</code>.</li>
-              <li>Debug in order: <b>get → describe → logs → events</b>.</li>
-              <li>Verify the result the task asks for, then <code>exit</code> back to the base host.</li>
-              <li>Skip anything over ~8 min, note it on the notepad, and come back to it.</li>
-            </ol>
-            <h3>Practice environments</h3>
-            <div class="ck-links">
-              <a href="https://kodekloud.com/courses/cka-certification-course-certified-kubernetes-administrator/" target="_blank" rel="noopener">KodeKloud CKA course + labs ↗</a>
-              <a href="https://killercoda.com/playgrounds" target="_blank" rel="noopener">Killercoda free playgrounds ↗</a>
-              <a href="https://killer.sh" target="_blank" rel="noopener">killer.sh simulator (2 sessions with exam) ↗</a>
-              <a href="https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/" target="_blank" rel="noopener">LF CKA page & curriculum ↗</a>
-              <a href="https://docs.linuxfoundation.org/tc-docs/certification/tips-cka-and-ckad" target="_blank" rel="noopener">LF exam tips & allowed resources ↗</a>
-              <a href="https://github.com/techiescamp/cka-certification-guide" target="_blank" rel="noopener">TechiesCamp CKA guide ↗</a>
-              <a href="https://github.com/chadmcrowell/CKA-Exercises" target="_blank" rel="noopener">chadmcrowell CKA exercises ↗</a>
+            <h2>Same routine for every task</h2>
+            <ol class="ck-steps"><li v-for="r in exam.routine" :key="r" v-html="fmt(r)"></li></ol>
+          </article>
+        </div>
+
+        <h2 class="ck-h2">Question types by domain</h2>
+        <details v-for="(qt, qi) in questionTypes" :key="qt.domain" class="ck-qt" :open="qi === 0">
+          <summary><span class="ck-qt-w">{{ domainWeight(qt.domain) }}%</span><b>{{ qt.domain }}</b><span class="ck-muted small">{{ qt.items.length }} task types</span></summary>
+          <div class="ck-qt-body">
+            <div v-for="it in qt.items" :key="it.q" class="ck-qt-item">
+              <p class="ck-qt-q">“{{ it.q }}”</p>
+              <p class="ck-qt-how" v-html="fmt(it.how)"></p>
+              <div class="ck-qt-labs"><span>Practise:</span>
+                <template v-for="id in it.labs" :key="id"><a v-if="labInfo(id)" :href="'#/topic/' + labInfo(id).topic.id + '/labs'" :class="{ done: mastered[id] }">{{ mastered[id] ? '✓ ' : '' }}{{ labInfo(id).task.title }}</a></template>
+              </div>
+            </div>
+            <details class="ck-comp"><summary>Official competencies for this domain</summary><ul><li v-for="c in (domains.find(d => d.name === qt.domain) || {}).competencies" :key="c">{{ c }}</li></ul></details>
+          </div>
+        </details>
+
+        <h2 class="ck-h2">Useful links</h2>
+        <div class="ck-links cols"><a v-for="l in exam.links" :key="l.url" :href="l.url" target="_blank" rel="noopener">{{ l.label }} ↗</a></div>
+        <p class="ck-foot">Facts from the Linux Foundation CKA page and candidate handbook. Task types are summarised from the public curriculum and candidate reports; check the LF page for the current version before booking.</p>
+      </section>
+
+      <!-- Cheat sheet & paths -->
+      <section v-else-if="route.view==='ref'" class="ck-page">
+        <h1 class="ck-h1">📋 Cheat sheet</h1>
+        <p class="ck-lead">The short list to know by heart. Click any command or path to copy it.</p>
+        <div class="ck-tabs" role="tablist">
+          <a role="tab" :aria-selected="route.tab==='cmds'" :class="{ active: route.tab==='cmds' }" href="#/ref/cmds">Shorthand commands</a>
+          <a role="tab" :aria-selected="route.tab==='paths'" :class="{ active: route.tab==='paths' }" href="#/ref/paths">Config file paths</a>
+        </div>
+        <div class="ck-toolbar"><input v-model="refFilter" type="search" :placeholder="route.tab==='paths' ? 'Filter paths (kubelet, etcd, cert…)' : 'Filter commands (drain, secret, etcd…)'" /></div>
+
+        <div v-if="route.tab==='cmds'" class="ck-cheat-grid">
+          <article v-for="g in cheatGroups" :key="g.group" class="ck-cheat">
+            <h3>{{ g.icon }} {{ g.group }}</h3>
+            <div v-for="it in g.items" :key="it[0]" class="ck-crow" @click="copy(it[1])" title="Click to copy">
+              <span class="ck-cuse">{{ it[0] }}</span><code class="ck-ccmd">{{ it[1] }}</code>
             </div>
           </article>
         </div>
 
-        <h2 class="ck-h2">Study path</h2>
-        <div class="ck-topic-grid">
-          <a v-for="(t, i) in topics" :key="t.id" class="ck-topic-card" :href="'#/topic/' + t.id">
-            <div class="ck-tc-top"><span class="ck-tc-icon">{{ t.icon }}</span><span class="ck-tc-num">{{ String(i + 1).padStart(2, '0') }}</span></div>
-            <h3>{{ t.title }}</h3>
-            <p class="ck-tc-kk">{{ t.kodekloud }}</p>
-            <p class="ck-tc-meta">{{ t.concepts.length }} concepts · {{ t.commands.length }} commands · {{ t.tasks.length }} labs</p>
-            <div class="ck-bar thin"><i :style="{ width: topicProgress(t) + '%' }"></i></div>
-          </a>
+        <div v-else>
+          <div class="ck-callout">These are <b>kubeadm defaults</b>. On the exam, confirm on the task host: the kubelet's <code>--config</code> flag (<code>ps -ef | grep kubelet</code>) points to its config file, and <code>staticPodPath</code> in that file is the static Pod folder.</div>
+          <article v-for="g in pathGroups" :key="g.group" class="ck-card ck-paths">
+            <div class="ck-paths-head"><h2>{{ g.group }}</h2></div>
+            <div class="ck-table-wrap"><table class="ck-table">
+              <tbody><tr v-for="r in g.rows" :key="r[0]">
+                <td class="ck-pname">{{ r[0] }}</td>
+                <td><code class="ck-path" @click="copy(r[1])" title="Click to copy">{{ r[1] }}</code></td>
+                <td class="ck-pnote" v-html="fmt(r[2])"></td>
+              </tr></tbody>
+            </table></div>
+            <div class="ck-find"><span>Find it on the host</span><div class="ck-code small"><pre>{{ g.find }}</pre><button class="ck-copy" @click="copy(g.find)">Copy</button></div></div>
+          </article>
         </div>
-        <p class="ck-foot">Content reviewed {{ reviewed }} against the LF CKA curriculum (Kubernetes {{ k8sVersion }}) and the KodeKloud CKA course outline. The labs are original practice tasks, not exam dumps. Run them in a disposable cluster.</p>
+        <p v-if="(route.tab==='cmds' ? cheatGroups : pathGroups).length === 0" class="ck-muted">Nothing matches “{{ refFilter }}”.</p>
       </section>
 
       <!-- Topic -->
@@ -130,10 +206,10 @@
         <header class="ck-topic-head">
           <div class="ck-th-icon">{{ topic.icon }}</div>
           <div>
-            <div class="ck-kicker">TOPIC {{ String(topicIndex + 1).padStart(2, '0') }} · {{ topic.kodekloud }}</div>
+            <div class="ck-kicker">TOPIC {{ String(topicIndex + 1).padStart(2, '0') }} OF {{ topics.length }} · {{ topic.kodekloud }}</div>
             <h1 class="ck-h1">{{ topic.title }}</h1>
             <p class="ck-lead" v-html="fmt(topic.summary)"></p>
-            <div class="ck-chips"><span class="chip" v-for="o in topic.objectives" :key="o">{{ o }}</span></div>
+            <details class="ck-obj"><summary>Curriculum lines covered ({{ topic.objectives.length }})</summary><div class="ck-chips"><span class="chip" v-for="o in topic.objectives" :key="o">{{ o }}</span></div></details>
           </div>
         </header>
 
@@ -320,6 +396,7 @@
   <script src="../js/cka/topics/12-kustomize.js"></script>
   <script src="../js/cka/topics/13-crds-operators.js"></script>
   <script src="../js/cka/topics/14-troubleshooting.js"></script>
+  <script src="../js/cka/reference.js"></script>
   <script src="../js/cka/app.js"></script>
 </body>
 </html>
