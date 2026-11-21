@@ -167,16 +167,23 @@
 
       <!-- Cheat sheet & paths -->
       <section v-else-if="route.view==='ref'" class="ck-page">
-        <h1 class="ck-h1">📋 Cheat sheet</h1>
-        <p class="ck-lead">The short list to know by heart. Click any command or path to copy it.</p>
+        <div class="ck-ref-head">
+          <h1 class="ck-h1">📋 Cheat sheet</h1>
+          <div class="ck-ref-actions">
+            <a class="ck-btn small" href="#/drill" @click="drillCfg.source='ref'; saveState()">🃏 Drill these</a>
+            <button class="ck-btn small" @click="print()">🖨️ Print</button>
+          </div>
+        </div>
+        <p class="ck-lead">The short list to know by heart, written for a <b>kubeadm</b> cluster like the one in the exam. Click any command or path to copy it.</p>
         <div class="ck-tabs" role="tablist">
           <a role="tab" :aria-selected="route.tab==='cmds'" :class="{ active: route.tab==='cmds' }" href="#/ref/cmds">Shorthand commands</a>
           <a role="tab" :aria-selected="route.tab==='paths'" :class="{ active: route.tab==='paths' }" href="#/ref/paths">Config file paths</a>
         </div>
         <div class="ck-toolbar"><input v-model="refFilter" type="search" :placeholder="route.tab==='paths' ? 'Filter paths (kubelet, etcd, cert…)' : 'Filter commands (drain, secret, etcd…)'" /></div>
 
+        <nav v-if="route.tab==='cmds' && !refFilter" class="ck-jump"><a v-for="g in cheatGroups" :key="g.group" href="javascript:void 0" @click="jump('cg-' + g.group)">{{ g.icon }} {{ g.group }}</a></nav>
         <div v-if="route.tab==='cmds'" class="ck-cheat-grid">
-          <article v-for="g in cheatGroups" :key="g.group" class="ck-cheat">
+          <article v-for="g in cheatGroups" :key="g.group" class="ck-cheat" :class="{ short: g.exact }" :id="'cg-' + g.group">
             <h3>{{ g.icon }} {{ g.group }}</h3>
             <div v-for="it in g.items" :key="it[0]" class="ck-crow" @click="copy(it[1])" title="Click to copy">
               <span class="ck-cuse">{{ it[0] }}</span><code class="ck-ccmd">{{ it[1] }}</code>
@@ -185,8 +192,13 @@
         </div>
 
         <div v-else>
+          <article v-if="!refFilter" class="ck-card">
+            <div class="ck-paths-head"><h2>🗂️ Where everything lives (control-plane node)</h2><button class="ck-btn small" @click="copy(tree)">Copy</button></div>
+            <div class="ck-code ck-tree"><pre>{{ tree }}</pre></div>
+          </article>
+          <nav v-if="!refFilter" class="ck-jump"><a v-for="g in pathGroups" :key="g.group" href="javascript:void 0" @click="jump('pg-' + g.group)">{{ g.group }}</a></nav>
           <div class="ck-callout">These are <b>kubeadm defaults</b>. On the exam, confirm on the task host: the kubelet's <code>--config</code> flag (<code>ps -ef | grep kubelet</code>) points to its config file, and <code>staticPodPath</code> in that file is the static Pod folder.</div>
-          <article v-for="g in pathGroups" :key="g.group" class="ck-card ck-paths">
+          <article v-for="g in pathGroups" :key="g.group" class="ck-card ck-paths" :id="'pg-' + g.group">
             <div class="ck-paths-head"><h2>{{ g.group }}</h2></div>
             <div class="ck-table-wrap"><table class="ck-table">
               <tbody><tr v-for="r in g.rows" :key="r[0]">
@@ -302,33 +314,118 @@
 
       <!-- Drill -->
       <section v-else-if="route.view==='drill'" class="ck-page">
-        <h1 class="ck-h1">🃏 Command drill</h1>
-        <p class="ck-lead">You get a task description. Type the command (here, or better, in a real terminal), then reveal it and grade yourself. Commands you miss come back more often.</p>
-        <div class="ck-chips selectable">
-          <button class="chip" :class="{ on: !drillTopics.length }" @click="drillTopics = []; nextCard()">All topics</button>
-          <button v-for="t in topics" :key="t.id" class="chip" :class="{ on: drillTopics.includes(t.id) }" @click="toggleDrillTopic(t.id)">{{ t.icon }} {{ t.title }}</button>
-        </div>
-        <div v-if="card" class="ck-flash">
-          <div class="ck-flash-meta">{{ card.topic.icon }} {{ card.topic.title }} · {{ card.c.group }}</div>
-          <h2>{{ card.c.use }}</h2>
-          <p v-if="card.c.note" class="ck-muted" v-html="fmt(card.c.note)"></p>
-          <textarea v-model="drillAnswer" class="ck-answer" rows="3" placeholder="Type the command…" spellcheck="false" @keydown.ctrl.enter="drillReveal = true"></textarea>
-          <div v-if="drillReveal" class="ck-code"><pre>{{ card.c.cmd }}</pre><button class="ck-copy" @click="copy(card.c.cmd)">Copy</button></div>
-          <div class="ck-flash-actions">
-            <button v-if="!drillReveal" class="ck-btn primary" @click="drillReveal = true">Reveal (Ctrl+Enter)</button>
-            <template v-else>
-              <button class="ck-btn success" @click="grade(true)">✓ Knew it</button>
-              <button class="ck-btn danger" @click="grade(false)">✗ Missed it</button>
-            </template>
-            <button class="ck-btn ghost" @click="nextCard()">Skip</button>
+
+        <!-- setup -->
+        <template v-if="!drill.active && !drill.done">
+          <h1 class="ck-h1">🃏 Command drill</h1>
+          <p class="ck-lead">Read the task, type the command, press <kbd>Enter</kbd>. Your answer is checked for you (flag order, <code>kubectl</code>/<code>k</code> and <code>&lt;placeholders&gt;</code> don't matter), then you confirm the grade. Missed cards come back later in the session and more often next time.</p>
+
+          <div class="ck-card ck-dsetup">
+            <div class="ck-drow"><span class="ck-dlabel">Cards from</span>
+              <div class="ck-seg">
+                <button :class="{ on: drillCfg.source==='both' }" @click="setDrill('source','both')">Everything</button>
+                <button :class="{ on: drillCfg.source==='topics' }" @click="setDrill('source','topics')">Topic commands</button>
+                <button :class="{ on: drillCfg.source==='ref' }" @click="setDrill('source','ref')">Cheat sheet only</button>
+              </div>
+            </div>
+            <div class="ck-drow"><span class="ck-dlabel">Focus</span>
+              <div class="ck-seg">
+                <button :class="{ on: drillCfg.focus==='smart' }" @click="setDrill('focus','smart')">Smart mix</button>
+                <button :class="{ on: drillCfg.focus==='weak' }" @click="setDrill('focus','weak')">Weak spots <span class="cnt">{{ drillCounts.weak }}</span></button>
+                <button :class="{ on: drillCfg.focus==='fresh' }" @click="setDrill('focus','fresh')">Not seen yet <span class="cnt">{{ drillCounts.fresh }}</span></button>
+              </div>
+            </div>
+            <div class="ck-drow"><span class="ck-dlabel">Cards</span>
+              <div class="ck-seg">
+                <button v-for="n in [10, 20, 40]" :key="n" :class="{ on: drillCfg.size===n }" @click="setDrill('size', n)">{{ n }}</button>
+              </div>
+            </div>
+            <div v-if="drillCfg.source!=='ref'" class="ck-drow top"><span class="ck-dlabel">Topics</span>
+              <div>
+                <div class="ck-chips selectable">
+                  <button class="chip" :class="{ on: !drillCfg.topics.length }" @click="drillCfg.topics.splice(0); saveState()">All topics</button>
+                  <button v-for="t in topics" :key="t.id" class="chip" :class="{ on: drillCfg.topics.includes(t.id) }" @click="toggleDrillTopic(t.id)">{{ t.icon }} {{ t.title }}</button>
+                </div>
+              </div>
+            </div>
+            <div class="ck-dstart">
+              <button class="ck-btn primary big" @click="startDrill()">Start drill →</button>
+              <span class="ck-muted small">{{ drillCounts.total }} cards in scope · {{ drillCounts.known }} known · {{ drillCounts.weak }} weak · {{ drillCounts.fresh }} new</span>
+            </div>
           </div>
-        </div>
-        <div class="ck-stats">
-          <div><b>{{ session.ok }}</b><span>knew this session</span></div>
-          <div><b>{{ session.miss }}</b><span>missed this session</span></div>
-          <div><b>{{ drillKnown }}</b><span>known overall</span></div>
-          <div><b>{{ allCommands.length }}</b><span>commands in pool</span></div>
-        </div>
+        </template>
+
+        <!-- session -->
+        <template v-else-if="drill.active && drillCard">
+          <div class="ck-dbar">
+            <span class="ck-dpos">{{ drill.i + 1 }} / {{ drill.queue.length }}</span>
+            <div class="ck-bar"><i :style="{ width: (drill.i / drill.queue.length * 100) + '%' }"></i></div>
+            <span class="ck-dtally"><b class="ok">✓ {{ drillTally.ok }}</b> <b class="bad">✗ {{ drillTally.miss }}</b></span>
+            <button class="ck-btn small ghost" @click="endDrill">End</button>
+          </div>
+
+          <div class="ck-flash" ref="flash" tabindex="-1" @keydown="drillKeys">
+            <div class="ck-flash-meta">{{ drillCard.topic.icon }} {{ drillCard.topic.title }} · {{ drillCard.c.group }}
+              <span v-if="drillStats[drillCard.key]" class="ck-muted small"> · seen {{ drillStats[drillCard.key].ok + drillStats[drillCard.key].miss }}×, missed {{ drillStats[drillCard.key].miss }}</span></div>
+            <h2>{{ drillCard.c.use }}</h2>
+            <p v-if="drillHint && !drillResult" class="ck-hint"><span>Hint</span><code>{{ drillHintText }}</code></p>
+
+            <textarea v-model="drillAnswer" ref="answer" class="ck-answer" :class="drillResult && 'v-' + drillResult.verdict" rows="2" :readonly="!!drillResult"
+              placeholder="Type the command…" spellcheck="false" autocapitalize="off" autocomplete="off"
+              @keydown.enter.exact.prevent="checkCard" @keydown.esc.prevent="checkCard"></textarea>
+
+            <div v-if="!drillResult" class="ck-flash-actions">
+              <button class="ck-btn primary" @click="checkCard">Check <kbd>Enter</kbd></button>
+              <button class="ck-btn" @click="drillHint = true; $refs.answer.focus()" :disabled="drillHint">Hint</button>
+              <button class="ck-btn" @click="checkCard">Show answer <kbd>Esc</kbd></button>
+              <button class="ck-btn ghost" @click="skipCard">Skip</button>
+              <span class="ck-muted small ck-keys"><kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span>
+            </div>
+
+            <template v-else>
+              <div class="ck-verdict" :class="'v-' + drillResult.verdict">
+                <b v-if="drillResult.verdict==='exact'">✓ Correct</b>
+                <b v-else-if="drillResult.verdict==='close'">≈ Close: {{ drillResult.score }}% of the parts</b>
+                <b v-else-if="drillResult.verdict==='blank'">Answer</b>
+                <b v-else>✗ Not quite: {{ drillResult.score }}% of the parts</b>
+                <span v-if="drillResult.missing.length" class="ck-diff"><i>missing</i><code v-for="(t, ti) in drillResult.missing" :key="'m' + ti" class="miss">{{ t }}</code></span>
+                <span v-if="drillResult.extra.length" class="ck-diff"><i>not expected</i><code v-for="(t, ti) in drillResult.extra" :key="'x' + ti" class="extra">{{ t }}</code></span>
+              </div>
+              <div class="ck-code"><pre>{{ drillCard.c.cmd }}</pre><button class="ck-copy" @click="copy(drillCard.c.cmd)">Copy</button></div>
+              <p v-if="drillResult.placeholders" class="ck-muted small" style="margin:0">Anything is accepted where the answer shows <code>&lt;…&gt;</code>.</p>
+              <p v-if="drillCard.c.note" class="ck-note" v-html="fmt(drillCard.c.note)"></p>
+              <div class="ck-flash-actions">
+                <button class="ck-btn" :class="drillSuggest==='ok' ? 'success' : ''" @click="gradeCard(true)">✓ Got it <kbd>1</kbd></button>
+                <button class="ck-btn" :class="drillSuggest==='miss' ? 'danger' : ''" @click="gradeCard(false)">✗ Missed it <kbd>2</kbd></button>
+                <span class="ck-muted small ck-keys"><kbd>Enter</kbd> accepts the highlighted grade</span>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- summary -->
+        <template v-else>
+          <h1 class="ck-h1">🃏 Drill done</h1>
+          <div class="ck-stats">
+            <div><b class="ok">{{ drillTally.ok }}</b><span>right first time</span></div>
+            <div><b class="bad">{{ drillTally.miss }}</b><span>missed</span></div>
+            <div><b>{{ drillTally.skip }}</b><span>skipped</span></div>
+            <div><b>{{ drillKnown }}/{{ allCommands.length }}</b><span>topic commands known</span></div>
+          </div>
+          <div class="ck-dstart" style="margin:18px 0">
+            <button v-if="drillMissed.length" class="ck-btn primary" @click="startDrill(drillMissed.map(x => x.key))">Drill the {{ drillMissed.length }} missed again</button>
+            <button class="ck-btn" :class="{ primary: !drillMissed.length }" @click="startDrill()">New drill, same settings</button>
+            <button class="ck-btn ghost" @click="drill.done = false">Change settings</button>
+          </div>
+          <template v-if="drillMissed.length">
+            <h2 class="ck-h2">Review what you missed</h2>
+            <div v-for="x in drillMissed" :key="x.key" class="ck-cmd">
+              <div class="ck-cmd-head"><b>{{ x.c.use }}</b><span class="ck-muted small">{{ x.topic.icon }} {{ x.topic.title }} · {{ x.c.group }}</span></div>
+              <div class="ck-code"><pre>{{ x.c.cmd }}</pre><button class="ck-copy" @click="copy(x.c.cmd)">Copy</button></div>
+              <p v-if="x.c.note" class="ck-note" v-html="fmt(x.c.note)"></p>
+            </div>
+          </template>
+        </template>
       </section>
 
       <!-- Mock exam -->

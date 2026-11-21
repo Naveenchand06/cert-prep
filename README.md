@@ -24,9 +24,9 @@ Built with **Vue 3** (CDN global build) and hash routing, so it still deploys as
 
 - `#/`: dashboard. One "continue" button, the learn → drill → test loop, the study path grouped into 5 phases, and domain weights
 - `#/exam`: exam guide. Format and rules, the per-task routine, and the question types for each domain with a short recipe and links to the labs that practise them
-- `#/ref`: cheat sheet of shorthand commands (run, expose, drain, RBAC, etcd backup/restore, upgrade, Helm). `#/ref/paths`: config file paths (static Pods, kubelet, kubeconfigs, PKI, etcd, runtime/CNI, logs) with the command to confirm each on the host. Click to copy
+- `#/ref`: cheat sheet for a kubeadm cluster: kubectl shorthands, resource short names, get/filter, RBAC, certs and kubeconfig, kubeadm, upgrade, etcd, static Pods, systemd/crictl, troubleshooting, Helm. `#/ref/paths`: a directory tree of a control-plane node plus tables of config file paths, ports and cluster defaults, each with the command that confirms it on the host. Click to copy, print button, "Drill these" button
 - `#/topic/<id>/<tab>`: one topic, with tabs **Learn** (concepts, reference tables, exam traps), **Commands** (grouped, copy buttons, quiz mode that hides commands, "known" tracking), **YAML** templates, **Labs** (task → hidden solution → verify step, mark mastered) and **Docs**
-- `#/drill`: flashcards. You get a description, type the command, reveal and grade yourself; missed commands come back more often
+- `#/drill`: command drill sessions. Choose the source (topic commands, cheat sheet or both), focus (smart mix, weak spots, not seen yet), length and topics. Type the command and press Enter: the answer is checked as a bag of tokens, so flag order, `kubectl`/`k`, `--flag=v`/`--flag v`, short/plural resource names and `<placeholders>` don't matter. It shows missing and unexpected parts, suggests a grade (Enter accepts, 1/2 override), brings missed cards back later in the session, and ends with a summary and a "drill the missed again" button
 - `#/mock`: random labs weighted by exam domain, with a timer (default 16 tasks / 120 min), self-marking, pass/fail against 66% and history
 
 Press `/` anywhere to search all commands, YAML, labs and concepts.
@@ -56,7 +56,7 @@ Exam facts, question types, phases, paths and the cheat sheet live in `js/cka/re
 
 ### Storage keys
 
-`cka-mastered-v1` (mastered labs, same key as the original version), `cka-state-v2` (known commands, drill stats, last topic, mock history), `cka-mock-v2` (current mock exam).
+`cka-mastered-v1` (mastered labs, same key as the original version), `cka-state-v2` (known commands, drill stats, drill settings, last topic, mock history), `cka-mock-v2` (current mock exam).
 
 ### Sources
 

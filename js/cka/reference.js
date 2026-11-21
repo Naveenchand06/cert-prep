@@ -87,6 +87,39 @@ CKA.questionTypes = [
   ] },
 ];
 
+/* ---------- where everything lives on a kubeadm control-plane node ---------- */
+CKA.tree = R`/etc/kubernetes/
+├── admin.conf                     kubectl as cluster-admin  (cp → ~/.kube/config)
+├── super-admin.conf               system:masters, bypasses RBAC (break-glass)
+├── kubelet.conf                   kubelet → API server  (also on workers)
+├── controller-manager.conf        controller-manager → API server
+├── scheduler.conf                 scheduler → API server
+├── manifests/                     STATIC PODS: kubelet watches this folder
+│   ├── etcd.yaml
+│   ├── kube-apiserver.yaml
+│   ├── kube-controller-manager.yaml
+│   └── kube-scheduler.yaml
+└── pki/
+    ├── ca.crt  ca.key             cluster CA (signs everything)
+    ├── apiserver.crt/.key         API server serving cert (SANs)
+    ├── apiserver-kubelet-client.crt/.key
+    ├── apiserver-etcd-client.crt/.key
+    ├── front-proxy-ca.crt  front-proxy-client.crt
+    ├── sa.key  sa.pub             ServiceAccount token signing
+    └── etcd/  ca.crt  server.crt/.key  peer.crt/.key  healthcheck-client.crt/.key
+
+/var/lib/kubelet/
+├── config.yaml                    KubeletConfiguration: staticPodPath, clusterDNS, cgroupDriver
+├── kubeadm-flags.env              --container-runtime-endpoint, --node-ip
+└── pki/                           kubelet client + serving certs
+/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf   kubelet systemd drop-in
+/var/lib/etcd/                     etcd data dir (hostPath in etcd.yaml)
+/etc/containerd/config.toml        runtime config (SystemdCgroup = true)
+/etc/cni/net.d/   /opt/cni/bin/    CNI config + plugin binaries
+/var/log/pods/    /var/log/containers/   container logs on the node
+
+Worker node: only kubelet.conf, pki/ca.crt and an empty manifests/ under /etc/kubernetes.`;
+
 /* ---------- config file paths (kubeadm defaults) ---------- */
 CKA.paths = [
   { group: 'Static Pods (control plane)', find: R`grep staticPodPath /var/lib/kubelet/config.yaml`, rows: [
@@ -104,6 +137,8 @@ systemctl cat kubelet`, rows: [
     ['systemd drop-in', '/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf', 'Older installs: /etc/systemd/system/kubelet.service.d/'],
     ['Kubelet kubeconfig', '/etc/kubernetes/kubelet.conf', 'Identity the kubelet uses to talk to the API server'],
     ['Kubelet certs', '/var/lib/kubelet/pki/', '`kubelet-client-current.pem` rotates'],
+    ['Bootstrap kubeconfig', '/etc/kubernetes/bootstrap-kubelet.conf', 'Only during `kubeadm join`, then replaced by kubelet.conf'],
+    ['Pod volumes on disk', '/var/lib/kubelet/pods/<uid>/volumes/', 'emptyDir and mounted Secrets live here'],
     ['Cluster copy', 'kube-system/kubelet-config ConfigMap', 'Used by `kubeadm upgrade node` / join'],
   ] },
   { group: 'kubeconfig files', find: R`k config view --minify`, rows: [
@@ -122,10 +157,37 @@ kubeadm certs check-expiration`, rows: [
     ['ServiceAccount keys', '/etc/kubernetes/pki/sa.key · sa.pub', 'Sign / verify SA tokens'],
     ['Front proxy', '/etc/kubernetes/pki/front-proxy-ca.crt', 'Aggregation layer (metrics-server)'],
     ['etcd CA + server', '/etc/kubernetes/pki/etcd/ca.crt · server.crt · server.key', 'Use these for `etcdctl snapshot save`'],
+    ['etcd peer', '/etc/kubernetes/pki/etcd/peer.crt · peer.key', 'etcd member ↔ member (port 2380)'],
+    ['etcd healthcheck', '/etc/kubernetes/pki/etcd/healthcheck-client.crt · .key', 'Used by the etcd liveness probe'],
+    ['Renew', 'kubeadm certs renew all', 'Then restart the 4 static Pods (move manifests out and back) and refresh admin.conf'],
   ] },
   { group: 'etcd data', find: R`grep -E "data-dir|path:" /etc/kubernetes/manifests/etcd.yaml`, rows: [
     ['Data dir', '/var/lib/etcd/', 'Restore to a **new** dir, then change the hostPath'],
     ['Client endpoint', 'https://127.0.0.1:2379', 'Peer port is 2380'],
+  ] },
+  { group: 'Files you add to the API server', find: R`grep -E "encryption|audit|admission" /etc/kubernetes/manifests/kube-apiserver.yaml`, rows: [
+    ['Encryption at rest', '--encryption-provider-config=/etc/kubernetes/enc/enc.yaml', 'Path is your choice. Also add a **hostPath volume + volumeMount** for the folder, or the Pod will not start'],
+    ['Audit policy', '--audit-policy-file=/etc/kubernetes/audit-policy.yaml', 'With `--audit-log-path=/var/log/kubernetes/audit/audit.log`. Mount both'],
+    ['Admission config', '--admission-control-config-file=<file>', 'Plugins themselves: `--enable-admission-plugins=NodeRestriction,...`'],
+    ['Scheduler profiles', '/etc/kubernetes/my-scheduler.yaml', 'Passed to kube-scheduler with `--config`'],
+  ] },
+  { group: 'Ports (kubeadm defaults)', find: R`ss -tlnp | grep -E "6443|2379|2380|10250|10257|10259"`, rows: [
+    ['kube-apiserver', '6443', 'What `server:` in every kubeconfig points to'],
+    ['etcd', '2379 · 2380', 'Client · peer'],
+    ['kubelet API', '10250', 'logs/exec go API server → kubelet on this port'],
+    ['kube-scheduler', '10259', 'HTTPS health: `/healthz`'],
+    ['kube-controller-manager', '10257', 'HTTPS health: `/healthz`'],
+    ['kube-proxy', '10256 · 10249', 'healthz · metrics'],
+    ['NodePort range', '30000-32767', '`--service-node-port-range` on the API server'],
+    ['CoreDNS', '53 (UDP+TCP) · 9153', 'DNS · metrics'],
+  ] },
+  { group: 'Cluster defaults', find: R`k -n kube-system get cm kubeadm-config -o yaml | grep -E "Subnet|kubernetesVersion|dnsDomain"`, rows: [
+    ['Service CIDR', '10.96.0.0/12', '`--service-cluster-ip-range` (kube-apiserver.yaml)'],
+    ['kubernetes Service', '10.96.0.1', 'First IP of the Service CIDR'],
+    ['DNS Service (kube-dns)', '10.96.0.10', '`clusterDNS` in /var/lib/kubelet/config.yaml'],
+    ['Pod CIDR', 'kubeadm init --pod-network-cidr=…', 'No default. Shows as `--cluster-cidr` in kube-controller-manager.yaml. Must match the CNI'],
+    ['Cluster domain', 'cluster.local', '`<svc>.<ns>.svc.cluster.local`, `clusterDomain` in kubelet config'],
+    ['cgroup driver', 'systemd', 'kubelet `cgroupDriver` and containerd `SystemdCgroup = true` must agree'],
   ] },
   { group: 'Runtime & CNI', find: R`crictl info | head
 ls /etc/cni/net.d/`, rows: [
@@ -158,6 +220,29 @@ CKA.cheats = [
     ['Switch namespace', R`k config set-context --current --namespace=<ns>`],
     ['Switch context', R`k config use-context <ctx>`],
     ['Look up a field', R`k explain pod.spec.containers.securityContext`],
+    ['Every field, nested', R`k explain deploy.spec --recursive | less`],
+    ['vim for YAML', R`echo 'set ts=2 sw=2 et ai nu' >> ~/.vimrc`],
+    ['Paste in vim without indent mess', R`:set paste`],
+    ['Use another kubeconfig', R`k get no --kubeconfig /etc/kubernetes/admin.conf`],
+  ] },
+  { group: 'Resource short names', icon: '🏷️', exact: true, drillNote: 'Type the short name `kubectl` accepts.', items: [
+    ['pods', 'po'], ['deployments', 'deploy'], ['replicasets', 'rs'], ['daemonsets', 'ds'], ['statefulsets', 'sts'],
+    ['services', 'svc'], ['endpoints', 'ep'], ['namespaces', 'ns'], ['nodes', 'no'], ['configmaps', 'cm'],
+    ['serviceaccounts', 'sa'], ['persistentvolumes', 'pv'], ['persistentvolumeclaims', 'pvc'], ['storageclasses', 'sc'],
+    ['ingresses', 'ing'], ['networkpolicies', 'netpol'], ['cronjobs', 'cj'], ['horizontalpodautoscalers', 'hpa'],
+    ['poddisruptionbudgets', 'pdb'], ['customresourcedefinitions', 'crd'], ['priorityclasses', 'pc'],
+    ['resourcequotas', 'quota'], ['limitranges', 'limits'], ['certificatesigningrequests', 'csr'], ['events', 'ev'],
+    ['List every short name', 'k api-resources'],
+  ] },
+  { group: 'Get & filter', icon: '🔎', items: [
+    ['Wide + labels', R`k get po -o wide --show-labels`],
+    ['All namespaces', R`k get po -A`],
+    ['By label', R`k get po -l app=web,tier!=db`],
+    ['Not running', R`k get po -A --field-selector=status.phase!=Running`],
+    ['Pods on one node', R`k get po -A -o wide --field-selector spec.nodeName=node01`],
+    ['Watch changes', R`k get po -w`],
+    ['Live object to YAML', R`k get deploy web -o yaml > web.yaml`],
+    ['Everything in a namespace', R`k get all -n web`],
   ] },
   { group: 'Pods', icon: '🫛', items: [
     ['Run a Pod', R`k run web --image=nginx --port=80 -l app=web`],
@@ -202,6 +287,18 @@ k create clusterrolebinding nv --clusterrole=node-view --user=jane`],
     ['SA token', R`k create token app-sa`],
     ['Approve a CSR', R`k certificate approve jane`],
   ] },
+  { group: 'Certificates & kubeconfig', icon: '🪪', items: [
+    ['Read a cert', R`openssl x509 -in /etc/kubernetes/pki/apiserver.crt -noout -text`],
+    ['Expiry date only', R`openssl x509 -in /etc/kubernetes/pki/apiserver.crt -noout -enddate`],
+    ['Key + CSR for a user', R`openssl genrsa -out jane.key 2048
+openssl req -new -key jane.key -subj "/CN=jane/O=dev" -out jane.csr`],
+    ['CSR for the API (base64)', R`base64 -w0 jane.csr`],
+    ['Get the signed cert', R`k get csr jane -o jsonpath='{.status.certificate}' | base64 -d > jane.crt`],
+    ['Add user to kubeconfig', R`k config set-credentials jane --client-key=jane.key --client-certificate=jane.crt --embed-certs
+k config set-context jane --cluster=kubernetes --user=jane`],
+    ['Who am I', R`k auth whoami`],
+    ['Contexts', R`k config get-contexts`],
+  ] },
   { group: 'Nodes', icon: '🖥️', items: [
     ['Cordon', R`k cordon node01`],
     ['Drain', R`k drain node01 --ignore-daemonsets --delete-emptydir-data`],
@@ -210,7 +307,18 @@ k create clusterrolebinding nv --clusterrole=node-view --user=jane`],
 k taint node node01 gpu=true:NoSchedule-`],
     ['Label a node', R`k label node node01 disk=ssd`],
     ['Usage', R`k top node; k top pod -A --sort-by=cpu`],
-    ['Join command', R`kubeadm token create --print-join-command`],
+  ] },
+  { group: 'kubeadm', icon: '🛠️', items: [
+    ['Init control plane', R`kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=<cp-ip>`],
+    ['kubeconfig after init', R`mkdir -p ~/.kube && sudo cp /etc/kubernetes/admin.conf ~/.kube/config && sudo chown $(id -u):$(id -g) ~/.kube/config`],
+    ['Join command (run on CP)', R`kubeadm token create --print-join-command`],
+    ['List tokens', R`kubeadm token list`],
+    ['Cert expiry', R`kubeadm certs check-expiration`],
+    ['Renew all certs', R`kubeadm certs renew all`],
+    ['Default config file', R`kubeadm config print init-defaults > kubeadm.yaml`],
+    ['Cluster config in use', R`k -n kube-system get cm kubeadm-config -o yaml`],
+    ['Kubeconfig for a user', R`kubeadm kubeconfig user --client-name=jane > jane.conf`],
+    ['Wipe a node', R`kubeadm reset -f`],
   ] },
   { group: 'etcd backup & restore', icon: '💾', items: [
     ['Backup', R`ETCDCTL_API=3 etcdctl snapshot save /opt/backup/etcd.db \
@@ -231,12 +339,34 @@ apt-get update && apt-mark unhold kubeadm && apt-get install -y kubeadm='1.37.1-
 systemctl daemon-reload && systemctl restart kubelet`],
     ['5. Uncordon', R`k uncordon <node>`],
   ] },
+  { group: 'Static Pods', icon: '📄', items: [
+    ['Find the folder', R`grep staticPodPath /var/lib/kubelet/config.yaml`],
+    ['Back up before editing', R`cp /etc/kubernetes/manifests/kube-apiserver.yaml /root/kube-apiserver.yaml.bak`],
+    ['Edit a component', R`vi /etc/kubernetes/manifests/kube-apiserver.yaml`],
+    ['Watch it come back', R`watch crictl ps`],
+    ['Create a static Pod', R`k run static-web --image=nginx $do > /etc/kubernetes/manifests/static-web.yaml`],
+    ['Force a restart', R`mv /etc/kubernetes/manifests/kube-scheduler.yaml /tmp/ && sleep 20 && mv /tmp/kube-scheduler.yaml /etc/kubernetes/manifests/`],
+  ] },
+  { group: 'Node: systemd & crictl', icon: '🐧', items: [
+    ['kubelet status', R`systemctl status kubelet`],
+    ['Restart after a config edit', R`systemctl daemon-reload && systemctl restart kubelet`],
+    ['Start + enable on boot', R`systemctl enable --now kubelet`],
+    ['kubelet logs', R`journalctl -u kubelet -n 50 --no-pager`],
+    ['Follow kubelet logs', R`journalctl -u kubelet -f`],
+    ['How the kubelet was started', R`ps -ef | grep [k]ubelet`],
+    ['All containers (incl. exited)', R`crictl ps -a`],
+    ['Pod sandboxes', R`crictl pods`],
+    ['Container logs', R`crictl logs <container-id>`],
+    ['Inspect a container', R`crictl inspect <container-id>`],
+    ['Images', R`crictl images`],
+  ] },
   { group: 'Troubleshoot', icon: '🩺', items: [
     ['Why is it failing?', R`k describe pod web | tail -20`],
     ['Logs of the crashed run', R`k logs web --previous`],
     ['Recent events', R`k get events -A --sort-by=.lastTimestamp | tail`],
-    ['kubelet health', R`systemctl status kubelet; journalctl -u kubelet -n 50 --no-pager`],
-    ['Containers on the node', R`crictl ps -a; crictl logs <id>`],
+    ['API server down: why?', R`crictl ps -a | grep kube-apiserver; crictl logs <container-id>`],
+    ['Pod logs without the API', R`ls /var/log/pods/; tail -50 /var/log/pods/kube-system_kube-apiserver-*/kube-apiserver/*.log`],
+    ['Component health', R`k get --raw='/readyz?verbose'`],
     ['Control-plane Pods', R`k -n kube-system get pods -o wide`],
   ] },
   { group: 'Helm & Kustomize', icon: '📦', items: [
